@@ -39,6 +39,10 @@ defmodule Genswarms.Objects.ConfigSchemaTest do
              ConfigSchema.validate_with_schema(nil, %{"templates" => %{}})
   end
 
+  test "empty patch is rejected (a validated patch restarts the object)" do
+    assert {:error, :empty_patch} = ConfigSchema.validate_with_schema(@schema, %{})
+  end
+
   test "host-escape keys are rejected unconditionally, before any schema logic" do
     hostile = Map.put(@schema, "properties", %{"extra_ro_binds" => %{"x-mutable" => true}})
 
