@@ -7,6 +7,8 @@ defmodule Genswarms.Objects.ConfigSchema do
   Fail-closed at every layer:
 
     * handler has no discoverable schema        → every patch rejected
+    * empty patch                               → rejected (a validated patch
+      restarts the object; an empty one must not be a free restart lever)
     * patch key absent from the schema          → rejected
     * patch key present but not `x-mutable`     → rejected
     * host-escape backend keys                  → rejected unconditionally
@@ -36,7 +38,8 @@ defmodule Genswarms.Objects.ConfigSchema do
 
   @doc "The pure half: validate a patch against an explicit schema (nil ⇒ reject all)."
   def validate_with_schema(schema, patch) when is_map(patch) do
-    with :ok <- no_forbidden(patch),
+    with :ok <- non_empty(patch),
+         :ok <- no_forbidden(patch),
          :ok <- bounded(patch),
          {:ok, schema} <- fetch_schema(schema),
          :ok <- all_mutable(patch, schema) do
@@ -45,6 +48,12 @@ defmodule Genswarms.Objects.ConfigSchema do
   end
 
   def validate_with_schema(_schema, _patch), do: {:error, :patch_must_be_object}
+
+  # An empty patch changes nothing config-wise, but a validated patch still
+  # restarts the object with the merged config — so `{"config": {}}` would be
+  # a free restart lever for any schema-bearing object. Reject it.
+  defp non_empty(patch) when map_size(patch) == 0, do: {:error, :empty_patch}
+  defp non_empty(_patch), do: :ok
 
   defp no_forbidden(patch) do
     case Enum.filter(@forbidden_keys, &Map.has_key?(patch, &1)) do
