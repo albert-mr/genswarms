@@ -6,12 +6,13 @@
 #     mix run examples/dynamic-swarm/demo.exs
 #
 # Demonstrates:
-#   1. Starting a swarm from a tiny seed
-#   2. Adding an ad-hoc observer object at runtime
-#   3. Scaling an agent group up and back down
-#   4. Inspecting the overlay event log
-#   5. Stop + restart preserves overlay (state survives)
-#   6. Snapshotting the effective config to a .exs
+#   1. Starting a swarm with no seed agents
+#   2. Adding the first agent at runtime
+#   3. Adding an ad-hoc observer object at runtime
+#   4. Scaling an agent group up and back down
+#   5. Inspecting the overlay event log
+#   6. Stop + restart preserves overlay (state survives)
+#   7. Snapshotting the effective config to a .exs
 
 alias Genswarms.SwarmManager
 alias Genswarms.Routing.Router
@@ -63,8 +64,8 @@ defmodule Demo do
   end
 end
 
-# --- 1. Start swarm from seed ---
-Demo.banner("Starting swarm from seed.exs (1 worker, no objects)")
+# --- 1. Start swarm from an empty seed ---
+Demo.banner("Starting swarm from seed.exs (no agents or objects)")
 
 seed_path = Path.join(__DIR__, "seed.exs")
 # Make sure a previous demo run is cleaned up
@@ -74,7 +75,19 @@ SwarmRegistry.clear_overlay("dynamic-demo")
 {:ok, swarm} = SwarmManager.start_swarm(seed_path)
 Demo.show_state(swarm)
 
-# --- 2. Add an observer object at runtime ---
+# --- 2. Add the first agent at runtime ---
+Demo.banner("Adding :worker_1 agent at runtime")
+
+{:ok, :worker_1} =
+  SwarmManager.add_agent(
+    swarm,
+    %{name: :worker_1, backend: :mock},
+    persist: true
+  )
+
+Demo.show_state(swarm)
+
+# --- 3. Add an observer object at runtime ---
 Demo.banner("Adding :observer object with incoming edge from :worker_1")
 
 {:ok, :observer} =
@@ -91,7 +104,7 @@ Demo.show_state(swarm)
 Router.route(swarm, :worker_1, :observer, "hello from worker_1")
 Process.sleep(50)
 
-# --- 3. Scale the worker group up to 4 ---
+# --- 4. Scale the worker group up to 4 ---
 Demo.banner("Scaling :worker to 4 (was 1, target 4)")
 
 {:ok, result} = SwarmManager.scale_agent_group(swarm, :worker, 4, persist: true)
@@ -100,7 +113,7 @@ IO.puts("  removed: #{inspect(result.removed)}")
 IO.puts("  failed:  #{inspect(result.failed)}")
 Demo.show_state(swarm)
 
-# --- 4. Scale back down to 2 ---
+# --- 5. Scale back down to 2 ---
 Demo.banner("Scaling :worker to 2 (extras get stopped)")
 
 {:ok, result} = SwarmManager.scale_agent_group(swarm, :worker, 2, persist: true)
@@ -108,7 +121,7 @@ IO.puts("  added:   #{inspect(result.added)}")
 IO.puts("  removed: #{inspect(result.removed)}")
 Demo.show_state(swarm)
 
-# --- 5. Inspect the overlay event log ---
+# --- 6. Inspect the overlay event log ---
 Demo.banner("Overlay event log (what persisted)")
 
 SwarmRegistry.load_overlay(swarm)
@@ -117,7 +130,7 @@ SwarmRegistry.load_overlay(swarm)
   IO.puts("  #{i}. #{op}  payload=#{inspect(payload, pretty: false)}")
 end)
 
-# --- 6. Stop and restart — overlay should replay ---
+# --- 7. Stop and restart — overlay should replay ---
 Demo.banner("Stopping and restarting (overlay should replay)")
 
 {:ok, _} = SwarmManager.stop(swarm)
@@ -127,7 +140,7 @@ IO.puts("  stopped.")
 IO.puts("  restarted. effective state:")
 Demo.show_state(swarm)
 
-# --- 7. Snapshot effective config to .exs ---
+# --- 8. Snapshot effective config to .exs ---
 Demo.banner("Snapshotting effective config (seed ⊕ overlay) to .exs")
 
 {:ok, config} = SwarmManager.get_full_config(swarm)

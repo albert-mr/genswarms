@@ -77,6 +77,15 @@ defmodule Genswarms.Config.SwarmConfigTest do
       assert parsed.agents == []
     end
 
+    test "still requires the agents key" do
+      assert {:error, :missing_or_empty_agents} = SwarmConfig.parse(%{name: "test"})
+    end
+
+    test "rejects a non-list agents value" do
+      assert {:error, :missing_or_empty_agents} =
+               SwarmConfig.parse(%{name: "test", agents: %{name: :not_a_list}})
+    end
+
     test "rejects agent names containing shell metacharacters (command-injection hardening)" do
       for evil <- [
             "a; touch /tmp/pwned",
