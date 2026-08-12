@@ -70,9 +70,11 @@ defmodule Genswarms.Config.SwarmConfigTest do
       assert {:error, :missing_name} = SwarmConfig.parse(config)
     end
 
-    test "rejects empty agents" do
+    test "accepts empty agents for dynamically managed swarms" do
       config = %{name: "test", agents: []}
-      assert {:error, :missing_or_empty_agents} = SwarmConfig.parse(config)
+
+      assert {:ok, parsed} = SwarmConfig.parse(config)
+      assert parsed.agents == []
     end
 
     test "rejects agent names containing shell metacharacters (command-injection hardening)" do

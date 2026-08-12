@@ -349,7 +349,7 @@ defmodule Genswarms.Config.SwarmConfig do
   defp validate_name(%{name: name}) when is_atom(name), do: {:ok, Atom.to_string(name)}
   defp validate_name(_), do: {:error, :missing_name}
 
-  defp validate_agents(%{agents: agents}) when is_list(agents) and length(agents) > 0 do
+  defp validate_agents(%{agents: agents}) when is_list(agents) do
     results = Enum.map(agents, &validate_agent/1)
     errors = Enum.filter(results, &match?({:error, _}, &1))
 
