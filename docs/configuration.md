@@ -13,7 +13,7 @@ A configuration is a map with the following keys.
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
 | `name` | string or atom | Yes | Unique swarm identifier. Must start with a letter and contain only alphanumerics, `_`, or `-`. Atoms are converted to strings. |
-| `agents` | list of maps | Yes | One or more agent definitions. Must be non-empty. |
+| `agents` | list of maps | Yes | Seed agent definitions. May be empty when agents are added at runtime. |
 | `objects` | list of maps | No | Non-agentic Elixir/backend components. Defaults to `[]`. |
 | `topology` | list of `{from, to}` tuples | No | Directed communication edges. Defaults to `[]`. |
 | `skills_base_dir` | string | No | Base directory to resolve skill files from. Stored on the parsed struct; not otherwise validated. |
@@ -33,6 +33,10 @@ A configuration is a map with the following keys.
   ]
 }
 ```
+
+The `agents` key is always required. Use `agents: []` to explicitly start an
+object-only or dynamically managed swarm; a missing key or non-list value is
+still rejected. See the [dynamic swarm example](../examples/dynamic-swarm/seed.exs).
 
 ## Agent configuration
 

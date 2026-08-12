@@ -182,7 +182,7 @@ defmodule Mix.Tasks.Genswarms.Config.Validate do
   defp format_error({:file_not_found, path}), do: "File not found: #{path}"
   defp format_error({:unsupported_format, ext}), do: "Unsupported format: #{ext}"
   defp format_error(:missing_name), do: "Missing required field: name"
-  defp format_error(:missing_or_empty_agents), do: "Agents list is required and cannot be empty"
+  defp format_error(:missing_or_empty_agents), do: "Agents list is required"
   defp format_error(:invalid_config_format), do: "Config must be a map"
 
   defp format_error({:invalid_name, msg}), do: "Invalid swarm name: #{msg}"

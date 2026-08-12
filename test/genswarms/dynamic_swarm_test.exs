@@ -83,6 +83,38 @@ defmodule Genswarms.DynamicSwarmTest do
     {:ok, swarm: swarm_name}
   end
 
+  test "an empty seed starts and accepts its first runtime agent" do
+    swarm = "empty-seed-#{System.unique_integer([:positive])}"
+    SwarmRegistry.clear_overlay(swarm)
+
+    config = %{
+      name: swarm,
+      agents: [],
+      objects: [%{name: :sink, handler: NoopHandler}],
+      topology: []
+    }
+
+    assert {:ok, ^swarm} = SwarmManager.start_from_config(config)
+
+    on_exit(fn ->
+      SwarmManager.stop(swarm)
+      SwarmRegistry.clear_overlay(swarm)
+    end)
+
+    assert {:ok, %{status: :running, config: %{agent_count: 0, object_count: 1}}} =
+             SwarmManager.status(swarm)
+
+    assert {:ok, :first} =
+             SwarmManager.add_agent(
+               swarm,
+               %{name: :first, backend: :mock},
+               connections: [:sink]
+             )
+
+    assert {:ok, %{config: %{agent_count: 1}}} = SwarmManager.status(swarm)
+    assert {:ok, [:sink]} = Router.get_connections(swarm, :first)
+  end
+
   describe "add_topology_edges/3" do
     test "adds edges to router and config", %{swarm: swarm} do
       :ok = SwarmManager.add_topology_edges(swarm, [{:sink, :alpha}])
