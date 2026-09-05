@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "verified_on": "2026-09-05",
+  "status": "core-verified-consumer-integration-pending",
+  "branch": "codex/ecosystem-hardening",
+  "source_revisions": {
+    "genswarms": "93a41d6698871d6f6bf2af9c8a79bfe52f9a04f6",
+    "subzero-sim": "bccd8430f2f15187128c877cd0f71429adc2807b",
+    "phylogenesis": "3a6f1250f37e2430e00980be6b6c22287cdc71bd",
+    "subzeroclaw": "8684b8b86569f16ff15bcc67ace7f34943967867",
+    "opencode-unhardcoded": "6476b0859cdc7cc2fce8d1dad05e3083fec88beb",
+    "genswarms-packages": "58e6d738f7b43731e5ff5d1f4204566ad999febc",
+    "swarmidx": "f366b499e5951824fb2e28058cec9b653caa0d03"
+  },
+  "consumers": {
+    "wingston-rally-bot": {
+      "revision": "780d1c9844d4c09ce4f8f0cf7d9609ac393e56e2",
+      "verification": "passed-offline-harness-and-sender-recovery-seams",
+      "not_verified": [
+        "Postgres durability",
+        "live Telegram delivery",
+        "rebuilt agent image"
+      ]
+    },
+    "micromarkets": {
+      "verification": "pending"
+    }
+  },
+  "open_regressions": [],
+  "tui_clients": {
+    "opencode": {
+      "version": "1.18.28",
+      "two_turns_and_reconnect": "passed-local-provider-fixture"
+    },
+    "codex": {
+      "version": "0.153.4",
+      "two_turns_and_reconnect": "passed-local-provider-fixture"
+    },
+    "claude": {
+      "version": "2.1.260",
+      "two_turns_and_reconnect": "passed-local-provider-fixture"
+    }
+  },
+  "contracts": {
+    "package_ir": "bidirectional-public-JSON-Go-Elixir-conformance-four-fixtures",
+    "ir_runtime_translation": "verified-snapshot-body-policy-handler-with-native-identity-and-runtime-preflight",
+    "package_integrity_and_database_restart": "nine-loopback-notary-scenarios-including-native-execution-and-independent-BEAM-restore-without-seed-file",
+    "notary_log": "all-returned-pages-verified-with-optional-independent-public-key-pin",
+    "notary_resolution": "required-independent-key-signed-log-replay-and-IR-pin-slot-validation",
+    "vendoring": "confined-files-staged-batches-writer-exclusion-lock-commit-and-explicit-process-exit-recovery",
+    "sqlite_payload_codec": "term-v1-with-legacy-read-support",
+    "object_startup": "async-readiness-barriers-and-fail-closed-overlay-replay",
+    "candidate": "bounded-json-patch-v1",
+    "evaluation": "operator-owned-training-and-frozen-holdout",
+    "port_runtime": "szc-wrapper-fifo",
+    "tui_runtime": "typed-completion-and-explicit-receipt-ack",
+    "delivery": "at-least-once-not-exactly-once",
+    "notary_concurrency": "full-45-test-suite-on-isolated-PostgreSQL-17-including-16-concurrent-publications"
+  },
+  "limits": [
+    "No deployment or merge is implied. Consumer pins and suites are still being integrated.",
+    "Authenticated package resolution does not prove log freshness or absence of split views.",
+    "Vendoring recovery tests cover process exit before/after lock commit and preservation of edited packages, not power-loss durability.",
+    "A missing or interrupted recovery journal and unsupported process-liveness checks fail closed and may require operator inspection.",
+    "CLI/API/daemons sharing a database must upgrade together for the term-v1 SQLite codec; old binaries cannot decode new payloads.",
+    "Native IR recovery requires referenced packages, images, skills and credentials; external effects and SQLite commits are not one atomic transaction.",
+    "Package code is trusted host code. Verified compilation is not a sandbox.",
+    "Simulation/evolution revisions below retain earlier verification until their final integration stage.",
+    "Wall time, agent count and output limits are not token or dollar caps.",
+    "The deterministic benchmark checks the evaluator contract, not product-quality improvement."
+  ],
+  "validation": {
+    "core": {
+      "tests": 773,
+      "failures": 0,
+      "skipped": 5,
+      "seed": 968530
+    },
+    "real_tui_fixtures": {
+      "tests": 3,
+      "failures": 0
+    },
+    "notary_sqlite": {
+      "tests": 45,
+      "failures": 0,
+      "skipped": 1
+    },
+    "notary_postgresql": {
+      "tests": 45,
+      "failures": 0,
+      "skipped": 0
+    },
+    "cross_repository_notary_runtime": {
+      "tests": 9,
+      "failures": 0
+    },
+    "ir_conformance": "four-fixtures-both-directions",
+    "gsp": "go-test-race-and-vet-pass; windows-amd64-and-darwin-arm64-cross-build-pass",
+    "subzeroclaw": "32-unit-and-six-loopback-runtime-tests-pass"
+  }
+}

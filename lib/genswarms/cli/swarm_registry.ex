@@ -19,6 +19,7 @@ defmodule Genswarms.CLI.SwarmRegistry do
 
   @db_path ".genswarms/swarms.db"
   @events_dir ".genswarms/events"
+  @max_ir_seed_bytes 16_777_216
 
   # Open database with busy timeout for concurrency
   defp open_db do
@@ -104,6 +105,14 @@ defmodule Genswarms.CLI.SwarmRegistry do
 
     Exqlite.Sqlite3.execute(db, """
       CREATE INDEX IF NOT EXISTS idx_overlays_swarm ON swarm_overlays(swarm, seq)
+    """)
+
+    Exqlite.Sqlite3.execute(db, """
+      CREATE TABLE IF NOT EXISTS swarm_ir_seeds (
+        swarm TEXT PRIMARY KEY,
+        document TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
     """)
 
     # Swarm commands (CLI → daemon bridge)
@@ -272,6 +281,11 @@ defmodule Genswarms.CLI.SwarmRegistry do
     Exqlite.Sqlite3.bind(stmt4, [name])
     Exqlite.Sqlite3.step(db, stmt4)
     Exqlite.Sqlite3.release(db, stmt4)
+
+    {:ok, seed_stmt} = Exqlite.Sqlite3.prepare(db, "DELETE FROM swarm_ir_seeds WHERE swarm = ?")
+    Exqlite.Sqlite3.bind(seed_stmt, [name])
+    Exqlite.Sqlite3.step(db, seed_stmt)
+    Exqlite.Sqlite3.release(db, seed_stmt)
 
     Exqlite.Sqlite3.close(db)
     :ok
@@ -576,10 +590,9 @@ defmodule Genswarms.CLI.SwarmRegistry do
   """
   @spec enqueue_command(String.t(), atom(), map()) :: {:ok, integer()}
   def enqueue_command(swarm_name, op, payload) do
+    encoded = Jason.encode!(encode_overlay_value(payload))
     ensure_db_exists()
     {:ok, db} = open_db()
-
-    encoded = Jason.encode!(encode_overlay_value(payload))
 
     {:ok, stmt} =
       Exqlite.Sqlite3.prepare(db, """
@@ -624,6 +637,7 @@ defmodule Genswarms.CLI.SwarmRegistry do
   """
   @spec mark_command_done(integer(), term()) :: :ok
   def mark_command_done(command_id, result) do
+    encoded = Jason.encode!(encode_overlay_value(result))
     ensure_db_exists()
     {:ok, db} = open_db()
 
@@ -634,7 +648,7 @@ defmodule Genswarms.CLI.SwarmRegistry do
         WHERE id = ?
       """)
 
-    Exqlite.Sqlite3.bind(stmt, [Jason.encode!(encode_overlay_value(result)), command_id])
+    Exqlite.Sqlite3.bind(stmt, [encoded, command_id])
     Exqlite.Sqlite3.step(db, stmt)
     Exqlite.Sqlite3.release(db, stmt)
     Exqlite.Sqlite3.close(db)
@@ -691,27 +705,125 @@ defmodule Genswarms.CLI.SwarmRegistry do
   # -- Overlay (dynamic swarm event log) --
 
   @doc """
-  Appends an event to a swarm's overlay log.
+  Persists an immutable native IR seed as public JSON. An existing different
+  seed is never overwritten. Adopting legacy overlays without their original
+  IR seed is refused; that requires an explicit migration, not a guessed seed.
   """
-  @spec append_overlay(String.t(), atom(), map()) :: :ok
-  def append_overlay(swarm_name, op, payload) do
+  @spec save_ir_seed(Genswarms.IR.State.t()) :: :ok | {:error, atom()}
+  def save_ir_seed(%Genswarms.IR.State{} = state) do
+    with {:ok, document} <- encode_ir_seed(state) do
+      with_seed_db(fn db ->
+        with :done <-
+               seed_step(
+                 db,
+                 """
+                   INSERT INTO swarm_ir_seeds (swarm, document, created_at)
+                   SELECT ?, ?, datetime('now', 'subsec')
+                   WHERE NOT EXISTS (SELECT 1 FROM swarm_overlays WHERE swarm = ?)
+                   ON CONFLICT(swarm) DO NOTHING
+                 """,
+                 [state.name, document, state.name]
+               ) do
+          case read_ir_seed(db, state.name) do
+            {:ok, stored} when stored === state -> :ok
+            {:ok, _} -> {:error, :ir_seed_conflict}
+            {:error, :not_found} -> {:error, :legacy_overlay_requires_migration}
+            error -> error
+          end
+        else
+          _ -> {:error, :ir_seed_storage_error}
+        end
+      end)
+    end
+  end
+
+  @doc "Loads and validates a native IR seed without reading any config file."
+  @spec load_ir_seed(String.t()) :: {:ok, Genswarms.IR.State.t()} | {:error, atom()}
+  def load_ir_seed(name), do: with_seed_db(&read_ir_seed(&1, name))
+
+  defp encode_ir_seed(state) do
+    with :desired <- state.phase,
+         :ok <- Genswarms.IR.State.validate_resolved(state),
+         {:ok, document} <- state |> Genswarms.IR.State.to_map() |> Jason.encode(),
+         true <- byte_size(document) <= @max_ir_seed_bytes,
+         {:ok, decoded} <- decode_ir_seed(document, state.name),
+         true <- decoded === state do
+      {:ok, document}
+    else
+      _ -> {:error, :invalid_ir_seed}
+    end
+  rescue
+    _ -> {:error, :invalid_ir_seed}
+  end
+
+  defp read_ir_seed(db, name) do
+    case seed_step(db, "SELECT document FROM swarm_ir_seeds WHERE swarm = ?", [name]) do
+      {:row, [document]} -> decode_ir_seed(document, name)
+      :done -> {:error, :not_found}
+      _ -> {:error, :ir_seed_storage_error}
+    end
+  end
+
+  defp decode_ir_seed(document, name)
+       when is_binary(document) and byte_size(document) <= @max_ir_seed_bytes do
+    with {:ok, map} <- Jason.decode(document),
+         {:ok, %{name: ^name, phase: :desired} = state} <- Genswarms.IR.State.parse(map),
+         :ok <- Genswarms.IR.State.validate_resolved(state) do
+      {:ok, state}
+    else
+      _ -> {:error, :invalid_persisted_ir_seed}
+    end
+  end
+
+  defp decode_ir_seed(_, _), do: {:error, :invalid_persisted_ir_seed}
+
+  defp with_seed_db(fun) do
     ensure_db_exists()
     {:ok, db} = open_db()
 
-    {:ok, stmt} =
-      Exqlite.Sqlite3.prepare(db, """
-        INSERT INTO swarm_overlays (swarm, seq, op, payload, applied_at)
-        VALUES (?, COALESCE((SELECT MAX(seq) FROM swarm_overlays WHERE swarm = ?), 0) + 1,
-                ?, ?, datetime('now', 'subsec'))
-      """)
+    try do
+      fun.(db)
+    after
+      Exqlite.Sqlite3.close(db)
+    end
+  rescue
+    _ -> {:error, :ir_seed_storage_error}
+  end
 
+  defp seed_step(db, sql, params) do
+    with {:ok, stmt} <- Exqlite.Sqlite3.prepare(db, sql) do
+      try do
+        with :ok <- Exqlite.Sqlite3.bind(stmt, params), do: Exqlite.Sqlite3.step(db, stmt)
+      after
+        Exqlite.Sqlite3.release(db, stmt)
+      end
+    end
+  end
+
+  @doc """
+  Appends an event to a swarm's overlay log.
+  """
+  @spec append_overlay(String.t(), atom(), map()) :: :ok | {:error, :overlay_storage_error}
+  def append_overlay(swarm_name, op, payload) do
     encoded_payload = Jason.encode!(encode_overlay_value(payload))
 
-    Exqlite.Sqlite3.bind(stmt, [swarm_name, swarm_name, to_string(op), encoded_payload])
-    Exqlite.Sqlite3.step(db, stmt)
-    Exqlite.Sqlite3.release(db, stmt)
-    Exqlite.Sqlite3.close(db)
-    :ok
+    result =
+      with_seed_db(fn db ->
+        seed_step(
+          db,
+          """
+            INSERT INTO swarm_overlays (swarm, seq, op, payload, applied_at)
+            VALUES (?, COALESCE((SELECT MAX(seq) FROM swarm_overlays WHERE swarm = ?), 0) + 1,
+                    ?, ?, datetime('now', 'subsec'))
+          """,
+          [swarm_name, swarm_name, to_string(op), encoded_payload]
+        )
+      end)
+
+    case result do
+      :done -> :ok
+      _ -> {:error, :overlay_storage_error}
+    end
   end
 
   @doc """
@@ -765,50 +877,74 @@ defmodule Genswarms.CLI.SwarmRegistry do
     end
   end
 
-  # Serialization: atoms get a "~" prefix, tuples become lists.
-  # Anonymous functions raise.
-  defp encode_overlay_value(value) when is_atom(value) and value not in [nil, true, false] do
-    "~" <> Atom.to_string(value)
-  end
+  # This is the internal CLI/daemon term codec, not the public JSON IR format.
+  # Tag containers as well as atoms so user maps/lists cannot impersonate tags.
+  # The former ~ prefix and tuple-as-list encoding were not invertible.
+  defp encode_overlay_value(value),
+    do: %{"$genswarms" => "term-v1", "value" => encode_term(value)}
 
-  defp encode_overlay_value(value) when is_tuple(value) do
-    value |> Tuple.to_list() |> Enum.map(&encode_overlay_value/1)
-  end
+  defp encode_term(value) when is_atom(value) and value not in [nil, true, false],
+    do: ["atom", Atom.to_string(value)]
 
-  defp encode_overlay_value(value) when is_list(value) do
-    Enum.map(value, &encode_overlay_value/1)
-  end
+  defp encode_term(value) when is_tuple(value),
+    do: ["tuple", value |> Tuple.to_list() |> Enum.map(&encode_term/1)]
 
-  defp encode_overlay_value(value) when is_map(value) do
-    value
-    |> Enum.map(fn {k, v} -> {encode_overlay_key(k), encode_overlay_value(v)} end)
-    |> Map.new()
-  end
+  defp encode_term(value) when is_list(value), do: ["list", Enum.map(value, &encode_term/1)]
 
-  defp encode_overlay_value(value) when is_function(value) do
+  defp encode_term(value) when is_map(value),
+    do: ["map", Enum.map(value, fn {k, v} -> [encode_term(k), encode_term(v)] end)]
+
+  defp encode_term(value) when is_function(value) do
     raise ArgumentError, "Cannot serialize function in overlay payload"
   end
 
-  defp encode_overlay_value(value), do: value
+  defp encode_term(value)
+       when is_binary(value) or is_number(value) or value in [nil, true, false],
+       do: value
 
-  defp encode_overlay_key(k) when is_atom(k), do: "~" <> Atom.to_string(k)
-  defp encode_overlay_key(k), do: k
+  defp encode_term(_), do: raise(ArgumentError, "Unsupported value in persistent payload")
 
-  defp decode_overlay_value("~" <> rest) do
+  defp decode_overlay_value(%{"$genswarms" => "term-v1", "value" => value}),
+    do: decode_term(value)
+
+  defp decode_overlay_value(%{"$genswarms" => _, "value" => _}),
+    do: raise(ArgumentError, "Unsupported persistent payload encoding")
+
+  defp decode_overlay_value(value), do: decode_legacy_value(value)
+
+  defp decode_term(["atom", name]) when is_binary(name), do: String.to_atom(name)
+
+  defp decode_term(["tuple", values]) when is_list(values),
+    do: values |> Enum.map(&decode_term/1) |> List.to_tuple()
+
+  defp decode_term(["list", values]) when is_list(values), do: Enum.map(values, &decode_term/1)
+
+  defp decode_term(["map", entries]) when is_list(entries),
+    do: Map.new(entries, fn [k, v] -> {decode_term(k), decode_term(v)} end)
+
+  defp decode_term(value)
+       when is_binary(value) or is_number(value) or value in [nil, true, false],
+       do: value
+
+  defp decode_term(_), do: raise(ArgumentError, "Invalid persistent payload encoding")
+
+  # Read existing rows without rewriting them. Their lost tuple/string type
+  # information cannot be recovered safely by guessing from the values.
+  defp decode_legacy_value("~" <> rest) do
     String.to_atom(rest)
   end
 
-  defp decode_overlay_value(value) when is_list(value) do
-    Enum.map(value, &decode_overlay_value/1)
+  defp decode_legacy_value(value) when is_list(value) do
+    Enum.map(value, &decode_legacy_value/1)
   end
 
-  defp decode_overlay_value(value) when is_map(value) do
+  defp decode_legacy_value(value) when is_map(value) do
     value
-    |> Enum.map(fn {k, v} -> {decode_overlay_key(k), decode_overlay_value(v)} end)
+    |> Enum.map(fn {k, v} -> {decode_overlay_key(k), decode_legacy_value(v)} end)
     |> Map.new()
   end
 
-  defp decode_overlay_value(value), do: value
+  defp decode_legacy_value(value), do: value
 
   defp decode_overlay_key("~" <> rest), do: String.to_atom(rest)
   defp decode_overlay_key(k), do: k

@@ -17,61 +17,181 @@ defmodule Genswarms.IR.ToConfig do
   alias Genswarms.Config.SwarmConfig
   alias Genswarms.IR.State.{Agent, Object}
 
+  @doc "Converts a complete parsed IR state to a validated runtime configuration."
+  @spec swarm_config(Genswarms.IR.State.t()) :: {:ok, SwarmConfig.t()} | {:error, term()}
+  def swarm_config(%Genswarms.IR.State{} = state) do
+    SwarmConfig.parse(%{
+      name: state.name,
+      agents: Enum.map(state.agents, &agent_spec/1),
+      objects: Enum.map(state.objects, &object_spec/1),
+      topology: state.topology,
+      options: state.options
+    })
+  rescue
+    _ -> {:error, :invalid_runtime_spec}
+  end
+
   @doc "IR agent -> runtime agent spec map."
   @spec agent_spec(Agent.t()) :: map()
   def agent_spec(%Agent{} = a) do
-    %{
-      name: a.name,
-      backend: backend(a.backend),
-      model: model(a.model),
-      skills: Map.get(a.overrides, "skills", []),
-      presets: a.overrides |> Map.get("presets", []) |> Enum.map(&String.to_atom/1),
-      config: a.config
-    }
+    skills = Map.get(a.overrides, "skills", [])
+
+    skills =
+      if a.body.scheme == "inline",
+        do: skills,
+        else: [Genswarms.Packages.Data.body!(a.body) | skills]
+
+    spec =
+      %{
+        name: a.name,
+        backend: backend(a.backend),
+        model: model(a.model),
+        skills: skills,
+        presets: a.overrides |> Map.get("presets", []) |> Enum.map(&String.to_existing_atom/1),
+        config: a.config |> SwarmConfig.atomize_known_backend_opts() |> normalize_option_values()
+      }
+      |> Map.merge(
+        Map.new(
+          for key <- [:endpoint, :request_extra, :compact_extra],
+              value = Map.get(a.overrides, Atom.to_string(key)),
+              not is_nil(value),
+              do: {key, value}
+        )
+      )
+
+    spec =
+      case a.model do
+        {:policy, ref} ->
+          extra =
+            case Map.get(spec, :request_extra, %{}) do
+              value when is_map(value) -> value
+              value when is_binary(value) -> Jason.decode!(value)
+            end
+
+          Map.put(
+            spec,
+            :request_extra,
+            Map.put(extra, "policy_ir", Genswarms.Packages.Data.policy!(ref))
+          )
+
+        _ ->
+          spec
+      end
+
+    if a.body.scheme != "inline" or elem(a.model, 0) == :policy do
+      Map.put(spec, :ir_slots, %{
+        "body" => Genswarms.IR.Ref.to_map(a.body),
+        "model" =>
+          case a.model do
+            {:policy, ref} -> %{"policy" => Genswarms.IR.Ref.to_map(ref)}
+            {:service, ref} -> Genswarms.IR.Ref.to_map(ref)
+          end,
+        "overrides" => a.overrides
+      })
+    else
+      spec
+    end
   end
 
   @doc "IR object -> runtime object spec map."
   @spec object_spec(Object.t()) :: map()
   def object_spec(%Object{} = o) do
-    %{name: o.name, handler: handler_module(o.handler), config: o.config}
+    %{name: o.name, handler: handler_spec(o.handler), config: o.config}
   end
 
   # ── backend ──────────────────────────────────────────────────────────────────
 
-  defp backend(%{scheme: "bwrap"}), do: :bwrap
-  defp backend(%{scheme: "local"}), do: :local
-  defp backend(%{scheme: "mock"}), do: :mock
-  defp backend(%{scheme: "oci", ref: ref}), do: {:docker, String.replace_prefix(ref, "oci:", "")}
-  defp backend(%{scheme: "apple_container", image: nil}), do: :apple_container
+  defp backend(%{scheme: "bwrap", opts: opts}), do: with_opts(:bwrap, opts)
+  defp backend(%{scheme: "local", opts: opts}), do: with_opts(:local, opts)
+  defp backend(%{scheme: "mock", opts: opts}), do: with_opts(:mock, opts)
 
-  defp backend(%{scheme: "apple_container", image: image, opts: opts})
+  defp backend(%{scheme: "oci", ref: ref, opts: opts}),
+    do: with_opts({:docker, String.replace_prefix(ref, "oci:", "")}, opts)
+
+  defp backend(%{scheme: "apple_container", image: nil, opts: opts})
        when opts == %{} or is_nil(opts),
-       do: {:apple_container, image}
+       do: :apple_container
+
+  defp backend(%{scheme: "apple_container", image: nil}),
+    do: raise(ArgumentError, "Apple container IR options require an explicit image")
 
   defp backend(%{scheme: "apple_container", image: image, opts: opts}),
-    do: {:apple_container, image, SwarmConfig.atomize_known_backend_opts(opts)}
-
-  defp backend(%{scheme: "tmux", client: client, opts: opts})
-       when opts == %{} or is_nil(opts),
-       do: {:tmux, client}
+    do: with_opts({:apple_container, image}, opts)
 
   defp backend(%{scheme: "tmux", client: client, opts: opts}),
-    do: {:tmux, client, SwarmConfig.atomize_known_backend_opts(opts)}
+    do: with_opts({:tmux, client}, opts)
 
-  defp backend(%{scheme: "ssh", host: host}), do: {:ssh, host}
+  defp backend(%{scheme: "ssh", host: host, opts: opts}), do: with_opts({:ssh, host}, opts)
+
+  defp with_opts(base, opts) when opts == %{} or is_nil(opts), do: base
+
+  defp with_opts(base, opts) do
+    opts = opts |> SwarmConfig.atomize_known_backend_opts() |> normalize_option_values()
+    if is_tuple(base), do: Tuple.insert_at(base, tuple_size(base), opts), else: {base, opts}
+  end
+
+  # These backend selectors are atoms at execution time, strings in JSON.
+  # Never create arbitrary atoms from IR values (Docker network names, etc.).
+  defp normalize_option_values(opts) do
+    Map.new(opts, fn
+      {:network, "isolated"} ->
+        {:network, :isolated}
+
+      {:privilege_mode, "rootless"} ->
+        {:privilege_mode, :rootless}
+
+      {:privilege_mode, "cgroup"} ->
+        {:privilege_mode, :cgroup}
+
+      {:proc_mount, "new"} ->
+        {:proc_mount, :new}
+
+      {:proc_mount, "bind"} ->
+        {:proc_mount, :bind}
+
+      {key, binds} when key in [:extra_ro_binds, :extra_rw_binds] ->
+        {key,
+         Enum.map(binds, fn
+           [source, target] when is_binary(source) and is_binary(target) -> {source, target}
+           {source, target} when is_binary(source) and is_binary(target) -> {source, target}
+           _ -> raise ArgumentError, "invalid IR bind pair"
+         end)}
+
+      entry ->
+        entry
+    end)
+  end
 
   # ── model ────────────────────────────────────────────────────────────────────
 
   # The translated default (`openrouter:default`) means "no explicit model".
   defp model({:service, %{ref: "openrouter:default"}}), do: nil
   defp model({:service, %{ref: ref}}), do: String.replace_prefix(ref, "openrouter:", "")
-  # A policy slot has no config-format model-string equivalent yet.
+  # Never silently replace an unresolved policy with the runtime default.
   defp model({:policy, _ref}), do: nil
 
   # ── handler ──────────────────────────────────────────────────────────────────
 
   # `module:<Mod>` -> the existing module atom (safe_concat never mints — #22).
-  defp handler_module(%{ref: ref}) do
+  defp handler_spec(%{scheme: "module", ref: ref}) do
     ref |> String.replace_prefix("module:", "") |> String.split(".") |> Module.safe_concat()
   end
+
+  defp handler_spec(%{scheme: "swarmidx", ref: ref, digest: digest, opts: opts}) do
+    unless Genswarms.IR.Ref.valid_digest?(digest) and is_map(opts) and
+             is_binary(opts["path"]) and opts["path"] != "" do
+      raise ArgumentError, "package handler requires a digest and explicit opts.path"
+    end
+
+    mode =
+      case Map.get(opts, "mode", "verify") do
+        "require" -> :require
+        "verify" -> :verify
+        _ -> raise ArgumentError, "invalid package handler load mode"
+      end
+
+    %{ref: ref, digest: digest, path: opts["path"], mode: mode}
+  end
+
+  defp handler_spec(_), do: raise(ArgumentError, "unsupported handler reference")
 end

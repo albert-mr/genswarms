@@ -14,10 +14,12 @@ It lives in `Genswarms.IR.*` and is exposed through the `Genswarms.IR` façade.
 !!! note "Status"
     The IR core, the config→IR translator, the op-validation policy, the
     reconcile/actuation layer, and the **default validation gate** are all
-    wired and in use. The package registry (`swarmidx`) and ref `resolve` step
-    (constraints → content digests) are future work; until then, configs map to
-    *inline*/`oci:`/`apple_container`/`ssh` refs rather than published
-    `swarmidx:` packages.
+    wired and in use. `gsp` and `swarmidx` provide authenticated package
+    resolution and vendoring. Runtime translation retains native package
+    handler refs and their explicit loader settings. Package bodies (`body.md`)
+    and policies (`policy.json`) are loaded from verified snapshots. Native desired IR seeds support
+    database-backed restart without the original configuration file;
+    unsupported execution translations fail rather than silently using defaults.
 
 ## The two representations
 
@@ -88,10 +90,38 @@ alias Genswarms.IR
 {:ok, desired} = IR.materialize(seed, overlay)
 # checkpoint + log compaction
 {:ok, checkpoint, remaining} = IR.compact(seed, overlay, at_seq)
+
+# public JSON serialization (not a dump of internal structs/BEAM terms)
+json = state |> Genswarms.IR.State.to_map() |> Jason.encode!()
+{:ok, restored} = json |> Jason.decode!() |> IR.state()
 ```
 
 `apply_op/3` is the single choke point where **both** the security policy
 (`IR.OpPolicy`) and the structural preconditions (`IR.Fold`) are enforced.
+
+## Native startup and recovery
+
+`Genswarms.start_swarm_from_ir(document)` accepts a parsed JSON map in desired,
+resolved form. It validates execution translation and stores an immutable public
+JSON seed in SQLite before boot. `Genswarms.restore_swarm(name)` restores that
+seed and replays successfully persisted runtime mutations. A different seed
+under the same name, corrupt data, and legacy overlays without their original
+seed are refused. Stopping preserves recovery data; purging deletes it.
+
+REST accepts `POST /api/swarms` with `{"ir": <document>}` and
+`POST /api/swarms/:name/restore`. Restart recognizes native seeds; `delete=true`
+is refused for them because replacing a seed must be explicit. The foreground
+CLI equivalents are `genswarms ir start seed.json` and
+`genswarms ir restore swarm-name` (also `mix genswarms.ir ...`). Run the CLI
+under a service supervisor for unattended operation.
+
+Recovery needs the same database and referenced runtime assets (package files,
+images, skills and operator-provided credentials), but not the original JSON
+file or writer process. It does not snapshot conversations, external services,
+or arbitrary Elixir closures. Use `persist: true` for durable runtime mutations.
+If a mutation takes effect but SQLite refuses its write, the caller receives
+`{:error, :applied_but_not_persisted}` and must reconcile before retrying; this is
+not an atomic transaction spanning SQLite and external runtime effects.
 
 ## From your config
 
@@ -102,15 +132,20 @@ alias Genswarms.IR
 |--------|-----|
 | `skills` / `presets` | `body {ref: "inline:<name>"}` + `overrides` |
 | `model: "x/y"` | `{ref: "openrouter:x/y", attested: true}` |
+| `endpoint` / `request_extra` / `compact_extra` | Same fields in agent `overrides`, restored on runtime translation |
 | `backend: :bwrap` / `:local` / `:mock` | bare refs `{ref: "bwrap"}` … |
+| `backend: {kind, opts}` for local/bwrap/mock | bare refs with `opts` retained |
 | `backend: {:docker, n}` | `{ref: "oci:<n>", kind: data}` |
+| `backend: {:docker, n, opts}` | `{ref: "oci:<n>", kind: data, opts: opts}` |
 | `backend: :apple_container` | `{ref: "apple_container"}` |
 | `backend: {:apple_container, n}` | `{ref: "apple_container", image: n}` |
 | `backend: {:apple_container, n, opts}` | `{ref: "apple_container", image: n, opts: opts}` |
 | `backend: {:ssh, "u@h"}` | `{ref: "ssh", host: "u@h"}` |
+| `backend: {:ssh, "u@h", opts}` | `{ref: "ssh", host: "u@h", opts: opts}` |
 | `backend: {:tmux, client}` | `{ref: "tmux", client: client}` |
 | `backend: {:tmux, client, opts}` | `{ref: "tmux", client: client, opts: opts}`; runner options such as `{runner: "docker", image: "coding-tuis:latest", client_source: "runtime"}` round-trip unchanged |
 | `object.handler Mod` | `{ref: "module:<Mod>", kind: code}` |
+| `object.handler %{ref, digest, path, mode}` | Native `swarmidx:` handler ref and digest, with `{path, mode}` in `handler.opts` |
 
 The Apple container ref is intentionally not content-addressable in the current
 IR mapping: it stores the backend choice and optional image/options metadata, but
@@ -120,6 +155,49 @@ does not claim an OCI digest. Docker keeps the existing `oci:<image>` mapping.
 `{:apple_container, image, opts}`.
 Tmux refs likewise preserve the declared client and known option keys across
 the config → IR → config round trip.
+
+Backend options are also retained for local, bwrap, mock, Docker and SSH refs.
+Known execution keys are restored to atom keys; JSON selectors such as
+`network: "isolated"` and `privilege_mode: "rootless"` become the runtime's
+atom selectors. Arbitrary string values are not converted to atoms. An Apple
+ref with nonempty options must declare its image explicitly; `ToConfig` refuses
+an unrepresentable form instead of dropping those options.
+
+Package handlers require an explicit `opts.path` to the installed package and
+`opts.mode: "verify" | "require"` (`"verify"` by default, matching the existing
+config loader). These options describe local execution, not signed registry
+metadata. Unknown load modes are rejected. The loader still checks package
+bytes. Require mode compiles exactly the verified in-memory sources and records
+the identities of the modules it produced. Verify mode accepts that recorded
+provenance, or a signed `beams` map in `swarm-object.json` containing module-name
+to `sha256:<compiled-BEAM-hash>` mappings. It checks the active code as well as
+the BEAM artifact. An unrelated loaded module is refused. Existing verify-mode
+packages without such evidence must add a build attestation or use require mode
+at boot; this deliberately tightens the previous insufficient check. Explicit
+require mode recompiles a preloaded, unproven entry from the verified snapshot;
+it never borrows that entry's existing identity. Modules already bound by this
+loader cannot silently change digest or code while another swarm uses them.
+
+Native data refs also use explicit `opts.path`: body packages contain UTF-8
+`body.md`, deployed as `package-body.md` with skill template substitution; policy
+packages contain `policy.json`, an object/list sent as `request_extra.policy_ir`.
+Policies remain data interpreted by the selected router, never evaluated as
+Elixir. The pinned policy takes precedence over an override's `policy_ir`.
+Runtime observation preserves the native refs and original overrides rather
+than replacing their identities with generated inline skills. Inline skill
+entries may also be `{"name":"persona.md","content":"..."}`; names are plain
+filenames. Bind options use JSON `[source,target]` pairs and become runtime
+tuples only for `extra_ro_binds`/`extra_rw_binds`.
+
+Package snapshots reject symlinks and special files and are limited to 10,000
+files/64 MiB. The same snapshot is hashed and consumed, so compilation never
+reopens a subsequently modified source file. Package code and the operator's
+filesystem remain trusted execution inputs: a signature is not a code sandbox.
+
+`State.to_map/1` and `Ref.to_map/1` emit the public JSON shape, retaining native
+refs, model-policy wrappers, execution metadata and explicit null options.
+They do not make arbitrary Elixir values portable: functions, tuples and
+other non-JSON metadata must not be treated as serialized IR checkpoints.
 
 ## The default control-plane gate
 
@@ -132,7 +210,8 @@ spawned:
   spawning**.
 - **On `add_agent`** — rejects host-escape backend config keys
   (`subzeroclaw_path`, `extra_ro_binds`, `extra_rw_binds`, `extra_path`) and the
-  per-swarm agent cap.
+  per-swarm agent cap. The key restrictions apply both to agent `config` and
+  backend tuple options / native IR `backend.opts`.
 - **On `scale_agent_group`** — enforces the agent cap.
 
 The cap defaults to `config :genswarms, :max_agents_per_swarm` (100) and applies
@@ -148,6 +227,13 @@ edges) — pure, no runtime access.
 live config (`observed`) and translates each action into a `SwarmManager` call.
 `Executor.reconcile(swarm, desired)` does the whole loop — observed → plan →
 apply.
+
+All runtime spec conversions are checked before the first mutation in a plan.
+An unsupported body/policy, missing handler binding or invalid runtime option
+returns `{:error, {:invalid_runtime_spec, one_based_position}}`, without dumping
+configuration values. A restart also stops if removing the old node fails;
+it does not attempt to add the replacement anyway. This preflight is not
+transactional rollback of runtime failures after valid actions have begun.
 
 ## Design spec
 

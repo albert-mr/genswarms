@@ -164,7 +164,8 @@ defmodule Genswarms.Config.SwarmConfig do
                           bwrap_executable xargs_executable state_dir client_source pass_env runner_env
                           keepalive_command client_store_paths nix_store_executable submit_delay_ms
                           submission_context_lines submit_retry_after_ms submit_max_attempts
-                          submit_check_max_errors)a
+                          submit_check_max_errors script port key_path nixos remote_skills_dir
+                          remote_user silently_accept_hosts password)a
 
   @type topology_edge :: {atom(), atom()}
 
@@ -245,6 +246,10 @@ defmodule Genswarms.Config.SwarmConfig do
   def backend_module({:tmux, _, _}), do: Genswarms.Backends.TmuxBackend
   def backend_module(:mock), do: Genswarms.Backends.MockBackend
   def backend_module({:mock, _}), do: Genswarms.Backends.MockBackend
+
+  @doc "Returns whether a backend configuration is supported, without starting it."
+  @spec valid_backend?(term()) :: boolean()
+  def valid_backend?(backend), do: validate_backend(backend) == :ok
 
   @doc """
   Gets the backend configuration from the backend spec.
@@ -454,7 +459,17 @@ defmodule Genswarms.Config.SwarmConfig do
     do: {:error, {:unsupported_client_source, value}}
 
   defp validate_skills(%{skills: skills}) when is_list(skills) do
-    if Enum.all?(skills, &is_binary/1) do
+    if Enum.all?(skills, fn
+         skill when is_binary(skill) ->
+           true
+
+         %{"name" => name, "content" => content} when is_binary(name) and is_binary(content) ->
+           name != "" and name not in [".", ".."] and Path.basename(name) == name and
+             not String.contains?(name, ["/", "\\", <<0>>])
+
+         _ ->
+           false
+       end) do
       :ok
     else
       {:error, :invalid_skills_format}

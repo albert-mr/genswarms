@@ -26,7 +26,11 @@ Tests run with the synchronous `EventStore.Sqlite` backend (set in `config/test.
 via `config :genswarms, :event_store, Genswarms.Observability.EventStore.Sqlite`) so
 that persist→query is deterministic, rather than the buffered default. The same
 config disables the Phoenix endpoint (`server: false`) and lowers the log level to
-`:warning`. Key test files include:
+`:warning`. It also sets `config :genswarms, :load_dotenv, false`, preventing
+automatic `.env` imports both at application startup and when loading a swarm
+configuration. Embedded callers can use the same setting; explicit
+`Genswarms.CLI.EnvManager.load/1` calls remain explicit imports.
+Key test files include:
 
 | File | Covers |
 |---|---|
@@ -35,6 +39,34 @@ config disables the Phoenix endpoint (`server: false`) and lowers the log level 
 | `test/genswarms/config/loader_test.exs` | config loading (`.exs`/`.json`/`.yaml`/`.yml`) |
 | `test/genswarms/config/swarm_config_test.exs` | config validation |
 | `test/genswarms/agents/inbox_test.exs` | the message queue |
+
+The bwrap lifecycle tests use a local echo executable through the real
+systemd/bwrap/FIFO transport, not a provider-backed agent. They require a reply
+round trip before claiming health and skip when the sandbox bases are absent.
+They do not need API keys; subzeroclaw/provider integration is a separate layer.
+
+### Explicit live Unhardcoded runtime check
+
+This manual command spends on model inference and is never run by `mix test`:
+
+```sh
+MIX_ENV=test GENSWARMS_ALLOWED_ENDPOINTS=router.ygr.ai \
+  mix run scripts/unhardcoded-smoke.exs /path/to/private.env /path/to/subzeroclaw
+```
+
+It requires configured bwrap sandbox bases and `socat`/`jq` on PATH. On Nix,
+run Mix inside `nix shell nixpkgs#socat nixpkgs#jq --command ...`.
+Only `UNHARDCODED_API_KEY` is read from the explicit env file; other variables
+are not imported. The key is not a command argument or printed output.
+
+The script uses `profile:agent`, a network-isolated bwrap sandbox, a fresh
+workspace and two tool-using turns. The host verifies the file changes from
+17 to 23 independently of the model's reply. It limits each turn to three
+client requests, requests 512 output tokens per call, and waits at most 90
+seconds per turn. Router-internal fallback and billing remain provider-controlled:
+these are not a guaranteed dollar cap. Cleanup stops the sandbox and removes
+the temporary workspace on normal completion/error, not on host loss/SIGKILL.
+Passing establishes this small live runtime contract, not product quality.
 
 ## Formatting
 
@@ -188,3 +220,34 @@ genswarms events --follow                                     # watch the event 
 - [backends.md](backends.md) — backend types including the mock backend
 - [cli.md](cli.md) — `genswarms` command reference
 - [configuration.md](configuration.md) — swarm config DSL and validation
+
+## Real-client TUI regression
+
+The opt-in tests pin OpenCode 1.18.28, Codex 0.153.4 and Claude Code 2.1.260.
+They run installed executables, not simulated terminals. Each completes two
+turns with a disconnect/reattach between them. Loopback SSE providers return
+deterministic tool calls; the real client's tool executor reads the task and
+writes its completion receipt. A shared harness checks completion, explicit ACK,
+readiness and reattachment for all three clients.
+
+    GENSWARMS_REAL_TUI=1 mix test test/genswarms/backends/real_tui_*_test.exs
+
+Normal runs skip these tests. Opted-in runs fail if tmux/a client is missing or
+its version differs: review the fixture and adapter before updating the pin.
+The fixtures use private homes and allowlisted environments, disable optional
+client integrations/telemetry, and send model traffic to loopback with no live
+model spend. External proxy traffic points at a closed local port; this is not
+OS-level network isolation. Tool permissions are explicit for controlled fixture
+commands. These checks prove transport compatibility, not model quality or that
+host execution is a sandbox.
+
+Codex uses an unauthenticated custom Responses provider in its private config,
+following [OpenAI configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
+Claude uses a local Messages gateway and a dummy fixture-only token, following
+[Claude environment variables](https://code.claude.com/docs/en/env-vars).
+Neither fixture reads or modifies the user's login/configuration.
+
+The pinned Codex CLI accepts approval policies `on-request` and `never`;
+`untrusted` is rejected before launch. Claude's screen-reader mode renders `$`,
+which the adapter recognizes only together with its screen-reader and client
+banner, not as a generic host-shell prompt.
