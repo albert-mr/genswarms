@@ -27,6 +27,18 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Every language version must be built from the current English source and translations, with share
+      # images rendered from the current headlines (website/i18n/build.lock.json, og.lock.json). On a mismatch
+      # the job stops here and the last good version stays live.
+      - name: Landing page and its translations are built from their sources and pass their tests
+        run: |
+          node --test website/tests/*.mjs
+          node website/build.mjs --check
+
       - name: Install imaging deps (for social cards)
         run: sudo apt-get update && sudo apt-get install -y libcairo2-dev libfreetype6-dev libffi-dev libjpeg-dev libpng-dev libz-dev pngquant
 
@@ -36,20 +48,14 @@ jobs:
       - name: Build docs into _site/docs
         run: mkdocs build --strict --site-dir _site/docs
 
+      - name: The deploy copy ships every language version and nothing else
+        run: bash design/check-deploy-copy.sh
+
       - name: Place landing page at site root
         run: |
-          cp website/index.html _site/index.html
-          cp website/og-image.png _site/og-image.png
-          cp website/CNAME _site/CNAME
-          cp website/robots.txt _site/robots.txt
-          cp website/sitemap.xml _site/sitemap.xml
-          cp website/404.html _site/404.html
+          rsync -a --exclude src --exclude tests --exclude tools --exclude i18n --exclude build.mjs website/ _site/
           touch _site/.nojekyll
-          # Serve the canonical skill at genswarms.com/skill.md (the landing's
-          # copy-to-agent prompt points here; kept in sync from the repo root).
           cp SKILL.md _site/skill.md
-          # AI/agent surface: curated index (llms.txt) + full-text dump (llms-full.txt)
-          cp website/llms.txt _site/llms.txt
           {
             echo "# GenSwarms — full documentation"
             echo
@@ -79,3 +85,16 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # Every version served right: 200s, /es -> /es/, lang, title, canonical, hreflang
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify the live language versions
+        run: |
+          for i in 1 2 3 4 5; do
+            node website/build.mjs --verify https://genswarms.com/ && exit 0
+            sleep 30
+          done
+          exit 1
