@@ -114,3 +114,128 @@ Native editor read of `/tr/` at 1440×900 and 390×844, cold first, then against
 | id | before | after | reason |
 |---|---|---|---|
 | 97dfad27 | geri yükle: tanım + {n} değişiklik | geri yükleme: tanım + {n} değişiklik | Final review: the English label is a noun; the spec row already says «geri yükleme». |
+
+## Redesign pass (2026-09)
+
+The v4 "Zoom" page: one canvas that zooms from the organization to one agent and back, with readouts under it, a legend, a facts row and capitalized spec and list lines. 91 ids translated (new or changed), 50 stale ids deleted. Every existing term decision above still holds; none was changed. Checked in a private temp build at 1440×900, 1024×768 and 390×844 (every zoom keyframe, header, sections, footer); `i18n-audit.cjs` against the served temp build: ok (2 languages × 18 sizes, canvas labels, suggestion bar, no-JS picker, 404).
+
+### Zoom caption (the scale the camera is at)
+
+| Level | EN | TR | Why |
+|---|---|---|---|
+| organization | organization | organizasyon | Ledger term (never "kuruluş"). |
+| team | team | ekip | Ledger term for a swarm with a purpose ("destek ekibi"). |
+| agent | agent | ajan | Ledger term; also the label under the agent drawn up close and the legend's circle. |
+| counts | {swarms} swarms · {agents} agents | {swarms} sürü · {agents} ajan | Turkish keeps the noun singular after a number ("36 sürü", "2.861 ajan"). |
+
+### Canvas labels
+
+| id | EN | TR | Note |
+|---|---|---|---|
+| 7242d340 | start · isolate · route · restart | başlat · yalıt · yönlendir · yeniden başlat | The four OS jobs as bare imperatives, the way Turkish service controls are labelled (Başlat / Durdur / Yeniden başlat). 43 chars vs budget 36: "yeniden başlat" has no shorter form that still means restart ("yenile" is refresh). The bar has room at 1024 and 1440; at 390 it is hidden in English too. |
+| c2e2d662 | process | süreç | Ledger. |
+| 9ed037b8 | sandbox | sandbox | Ledger (as developers say it); listed under `_same_as_english`. |
+| 76d1bfb6 | crashed | çöktü | Ledger (çökmek). |
+| 545c357f | restarted | yeniden başladı | Intransitive, as in step 4 ("Biri çökerse yeniden başlar"). 15 vs budget 14; "yeniden başlatıldı" would be 18. |
+| d493c317 | log of changes | değişiklik kaydı | Ledger (change log). |
+| 09d607fd | {n} declared | {n} tanımlı | Ledger (declared → tanımlı); reads "paths 4 tanımlı". |
+| 2a4a3109 | never logged | hiç kayda geçmedi | Ledger (logged → kayda geçer). |
+| 039b47cb | defines | tanımlar | Same root as "tanımlı": the document defines the swarm. |
+| cb79fe53 | restores from its database | veritabanından geri gelir | Ledger ("veritabanından geri gelir", as in step 8). A no-break space in "geri gelir" makes the canvas wrap it "veritabanından / geri gelir" instead of stranding "gelir". |
+
+### Legend and facts row
+
+| EN | TR | Why |
+|---|---|---|
+| agent / object / supervisor | ajan / nesne / denetleyici | Ledger. |
+| message on a declared path | tanımlı yoldaki mesaj | Short, and keeps "tanımlı yol". |
+| license / version / runtime | lisans / sürüm / çalışma ortamı | "runtime" is "çalışma ortamı" everywhere (ledger), here over "Elixir / OTP". |
+| Open source, MIT | Açık kaynak, MIT | Also on the share card. |
+
+### Readouts
+
+| Concept | TR | Why |
+|---|---|---|
+| K2 rows (model / prompt / tools) | bir sonraki adıma karar verir / işin ne olduğunu söyler / işi yapar | Plain verbs; "iş" twice ties the prompt to the tools. |
+| K3 rows | kim kiminle konuşur → her ajanın içine yazılmış; her biri nerede çalışır → nerede başlatıldıysa orada; biri çöktüğünde → onu yeniden başlatan yok | Echo step 2 ("kimin kiminle konuşacağını", "biri çöktüğünde"). |
+| K4 rows | başlat / yalıt / yönlendir / yeniden başlat, each with an object in the accusative ("her ajanı ayrı bir süreç olarak", "mesajları yalnızca tanımlı yollardan", "çöken ajanı, denetleyicisi aracılığıyla") | Same verbs as the canvas bar; the row reads as one command. |
+| K5 rows | ajan {n} / diğer {n} / çalışıyor / denetleyicisi yeniden başlattı | "diğer 11" is the natural "the other 11"; active voice, the supervisor as the subject. |
+| K7 caption | "Model çağrılarını answer ve research, budget üzerinden yapar." | Avoids opening a sentence with a lower-case agent name; "üzerinden" avoids a suffix on the bold name. |
+| K9 | geri yükleme → "tanım, sonra değişiklik 1, 2, 3" | Short form "tanım" (ledger) keeps the readout as short as the English: a taller readout made the 1024 stage fall back to the document alone. |
+| headings | olaylar / paketler / tek olay akışı + "(temsilî)" | Ledger (illustration → temsilî). |
+| alt texts | "Çizim: …" | The canvas's text alternative names what is drawn; "temsilî" stays for the visible caption. |
+
+### Changes to existing strings
+
+| id | before | after | reason |
+|---|---|---|---|
+| 3b3ae940 | Yapay zekâ iş gücü için işletim&nbsp;sistemi. | Yapay zekâ iş&nbsp;gücü için işletim sistemi. | Geist Mono is wider: at 1440 and 768 the unbreakable "işletim sistemi." no longer fit the column and Chrome broke off the full stop (and at 768 "sistem / i."). Now it breaks between words ("işletim / sistemi.") at those two widths and stays three lines elsewhere. |
+| 3c7c53c0 | Bunu bir işletim sistemi gibi düşünün. | Bunu bir işletim&nbsp;sistemi gibi düşünün. | Line break only: at 1024, 768 and 390 the term split as "işletim / sistemi". |
+| c39d7104 (was 4713393e) | Tek bir ekiple başlayın. Binlerce ajana büyüyün. | `<span>Tek bir&nbsp;ekiple başlayın.</span> <span>Binlerce ajana büyüyün.</span>` | New two-span markup. The no-break space stops "Tek bir" standing alone on phones (390, 320). |
+| 837e43c3 (was 8403b415) | nesneler: aynı graf üzerinde deterministik kod | Nesneler: aynı graftaki deterministik kod. | Capitalized line; "graftaki" as in step 6 after the editor pass. |
+| bff34e70 (was 36e77013) | başlangıç tanımı ve değişiklik kaydı; hatalı değişiklikler reddedilir; veritabanından geri yükleme | Başlangıç tanımı ve değişiklik kaydı. Hatalı değişiklikler reddedilir. Veritabanından geri yükleme. | Follows the English's three sentences. |
+| 9a976fc2 (was 7b7d0d74) | Seçip kopyalayın | Seçildi | The English changed meaning: the button now reports the state ("Selected"), next to Kopyala / Kopyalandı. |
+| 0a4470d6 (was 6ce82780) | Nasıl çalışır bölümüne atla | İçeriğe atla | The link now jumps to the content. |
+| e071ace2 (was 3229609e) | Lisans | Lisans (MIT) | As the English. |
+
+The other capitalized spec and list lines (7a956af2, a7b45c42, b02df163, ce5bafa3, 620402be, dfac9de1, c2593f94, 19b6c67d, 1de79ed2, 817dc80f, f294f1c2, bf0dfbad, a1804765, c1071d66, 90361c3e, 2944b590) keep their old translation, capitalized and ending in a full stop. The cold read of the whole page found nothing else to change: the story, spec sheet, comparison and guarantees read as one argument with the new labels.
+
+## Final review (2026-09)
+
+A fresh native-editor read of `/tr/` before launch: cold top to bottom, then string by string against the English, including meta and JSON-LD descriptions, canvas aria-labels (`#zoom-strings`), the 404 page and the suggestion bar. I took screenshots at 1440×900, 1024×768, 390×844, 320×640 and 844×390 (each keyframe after the camera settled, plus the header with the picker open, every section and the footer). The page reads as one argument and every term decision above holds. Four changes, none longer than the line it replaces where layout is tight. The temp build is clean, and `i18n-audit.cjs` (tr × 18 sizes) passes.
+
+| id | before | after | reason |
+|---|---|---|---|
+| 64e0fbb4 | her biri nerede çalışır | nerede çalışır | This K3 row label set the width of the label column, so all three answers wrapped on phones (twice at 320) where the English fits on one line. "Each one" is already in the caption above ("On iki ajan, her biri…"), and the answer "nerede başlatıldıysa orada" is singular. At 390 the rows now fit on one line, as in English. |
+| 6f4e39ae | … Model çağrılarını answer ve research, <b>budget</b> üzerinden yapar. | … Answer ve research, model çağrılarını <b>budget</b> üzerinden yapar. | Resolves translator doubt 3. The object-first order with a comma between the subject and the adverbial read as translated. The English itself capitalizes "Answer" at the start of the sentence, so plain subject–object–verb order is natural and follows the source. Same length. |
+| 0487a062 | … önce tanım, sonra değişiklikler, sırayla. | … önce tanım, sonra kayıttakiler, sırayla. | The English says "then the *logged* changes". That is the point of the caption: only logged changes are replayed, never refused ones. "Kayıttakiler" (the ones in the log) restores this and is one character shorter. "kayıtlı değişiklikler" and "değişiklik kaydı" both made the 1024 readout three lines, and the stage fell back to showing only the document. |
+| 8de95fd5 | Henüz yok | Henüz değil | "Henüz yok" reads as "there are none yet", which contradicts a list of five existing limits. "Henüz değil" is the plain "not yet". |
+
+### Translator doubts (redesign pass)
+
+| Doubt | Verdict |
+|---|---|
+| 1. H1 on four lines at 1440 and 768 | Keep the headline. On the current build it is three lines at 1440, 1024, 390 and 320. It breaks as "işletim / sistemi." only in the narrow 844×390 landscape column, between words and not as a stranded full stop. Any Turkish wording must end on "işletim sistemi". A smaller Turkish H1 there would be a CSS matter outside these files, and it isn't needed for launch. |
+| 2. Imperatives (başlat · yalıt · yönlendir · yeniden başlat) | Keep. The English labels are bare verbs, and Turkish service controls use exactly these imperatives. Verbal nouns would be about 50 characters on a bar budgeted at 36. The K4 rows ("başlat — her ajanı ayrı bir süreç olarak") read as one command, as the English does. |
+| 3. K7 caption word order | Changed (see 6f4e39ae): subject first, capitalized "Answer", as the English does. |
+| Minor: K4 values wrap on phones | Keep. English wraps these rows at 844×390 and 320 too. The only shorter wording would drop "mesajları" or "aracılığıyla", and it would still wrap because the label "yeniden başlat" is wide. |
+
+## Transcreation pass (2026-09-29)
+
+Brief: find every place that reads as translated from English and rewrite it the way a senior Turkish product marketer at a developer-tools company would. Meaning unchanged, no stronger claims. This pass **supersedes** the "AI workforce" rows above (Objects table, texture words, editor-pass flagship verdict) and the "runs → işletir" texture word.
+
+### "AI workforce" decision: **yapay zekâ ajanları** ("AI agents")
+
+Headline, footer tagline, page title and JSON-LD now read **"Yapay zekâ ajanları için işletim sistemi."** ("The operating system for AI agents.")
+
+- **Why not "yapay zekâ iş gücü" (the old choice).** In Turkish, the phrase belongs to labour-market coverage: PwC Türkiye ("Yapay Zekânın İş Alanlarına Etkisi"), kariyer.net's HR blog and CNBC-e use it for how AI affects the *human* workforce (jobs lost, reskilling). "Yapay zekâ iş gücü için işletim sistemi" can therefore read as "the OS for the AI-era labour force". This is the same trap as Korean «AI 인력» and the Spanish "fuerza laboral". Nobody searching for this product would type it.
+- **Why not "dijital iş gücü".** Salesforce's Turkish partners (CMS Wise, Kofana) use it to describe Agentforce, but only in body copy and as a business-outcome word. It drops "AI", it is RPA/CRM register, and it is not what developers search for.
+- **Why "yapay zekâ ajanları".** It is the term the Turkish tech press uses for this exact category. Webrazzi's headline on /dev/agents reads "Yapay zeka agent'ları için işletim sistemi geliştiren girişim", which is this headline almost word for word, and "AI ajanları / yapay zeka ajanları" is the working term in Salesforce-partner and press copy. It is already this page's term for "agent" (ledger), so the title, H1 and body now use one word. We chose the generic plural rather than Spanish's "your agents" ("ajanlarınız"), because the English is a generic category statement ("for AI workforces"), and the generic form is the one people search for. The scale that "workforce" carried stays in the lead ("Organizasyonunuz genelinde binlerce yapay zekâ ajanını…").
+- H1 markup: `Yapay&nbsp;zekâ ajanları için işletim sistemi.`. It breaks as "Yapay zekâ / ajanları için / işletim sistemi." at 1440, 1024 and 390.
+- Share image: the headline is on `og-tr.png`, so `tools/og.cjs` must re-render it before `--check` passes.
+
+### Changes
+
+| id | before | after | back-translation of after | why the before read as translated |
+|---|---|---|---|---|
+| 3b3ae940 | Yapay zekâ iş&nbsp;gücü için işletim sistemi. | Yapay&nbsp;zekâ ajanları için işletim sistemi. | The operating system for AI agents. | "Yapay zekâ iş gücü" is labour-market vocabulary (the human workforce affected by AI); a calque of *AI workforce*. |
+| 37294ee3 | Yapay zekâ iş gücü için işletim sistemi. | Yapay zekâ ajanları için işletim sistemi. | The operating system for AI agents. | Same term (footer tagline). |
+| 836e01a9 | GenSwarms: yapay zekâ iş gücü için işletim sistemi | GenSwarms: yapay zekâ ajanları için işletim sistemi | GenSwarms: the operating system for AI agents | Same term (page title, search result title). |
+| ffebc746 | Yapay zekâ iş gücü için işletim sistemi: yapay zekâ ajanlarını tanımlı mesaj yollarında ayrı, denetimli süreçler olarak çalıştırır; … | Yapay zekâ ajanları için işletim sistemi: her ajanı tanımlı mesaj yollarında ayrı, denetimli bir süreç olarak çalıştırır; REST + WebSocket API ve canlı olay akışı sunar. | The operating system for AI agents: runs each agent as a separate, supervised process on declared message paths; offers a REST + WebSocket API and a live event stream. | Same term; "her ajanı" avoids repeating "yapay zekâ ajanları" twice in one sentence. |
+| 96a75294 | Organizasyonunuz genelinde binlerce yapay zekâ ajanını devreye alın, koordine edin ve kontrol edin. | Organizasyonunuz genelinde binlerce yapay zekâ ajanını devreye alın, koordine edin ve kontrol altında tutun. | Across your organization, deploy thousands of AI agents, coordinate them and keep them under control. | "Kontrol edin" most often means "check / inspect" in Turkish; "kontrol altında tutun" is how Turkish says *control*. |
+| be8ebc37 | … devreye alın, koordine edin ve kontrol edin. | Yapay zekâ ajanlarını ayrı, denetimli süreçler olarak devreye alın, koordine edin ve kontrol altında tutun. | Deploy AI agents as separate, supervised processes, coordinate them and keep them under control. | Same as the lead (share text). |
+| 41acb76d | Yapay zekâ organizasyonunuza tek kontrol katmanı. | Tüm ajanlarınız için tek kontrol katmanı. | One control layer for all your agents. | "Yapay zekâ organizasyonu" is a calque of *AI organization*; no Turkish page says it. The organization of agents is "all your agents". |
+| 86d0513d | Organizasyonu GenSwarms&nbsp;işletir. | Organizasyonu GenSwarms&nbsp;yönetir. | GenSwarms runs [manages] the organization. | "İşletmek" collocates with businesses and facilities (otel, fabrika, hat işletmek), not with an organization; it was chosen to echo "işletim sistemi", and it read as a word game. "Yönetir" is the verb Turkish uses with "organizasyon", and it matches "yönetin" in step 9. |
+| c39d7104 | … <span>Binlerce ajana büyüyün.</span> | <span>Tek bir&nbsp;ekiple başlayın.</span> <span>Binlerce ajana ulaşın.</span> | Start with one team. Reach thousands of agents. | "Ajana büyümek" (grow into agents) is odd: the reader doesn't become agents. "X ile başlayın, Y’ye ulaşın" is the natural Turkish pair. It is not a stronger claim. |
+| 3c90a001 | Ya da ajanınıza bırakın: | Ya da kurulumu ajanınıza bırakın: | Or leave the setup to your agent: | "Bırakın" with no object is a calque of *hand it to*; Turkish needs to say what is left to the agent. |
+| e28ae737 | … API veya CLI ile yönetin ya da kodlama ajanınıza bırakın. | Her mesajı, çökmeyi ve yeniden başlatmayı anında izleyin. Sürüyü API ya da CLI ile yönetin veya bu işi kodlama ajanınıza bırakın. | Watch every message, crash and restart as it happens. Manage the swarm by API or CLI, or leave the job to your coding agent. | Two verbs with no object (English's "drive it … hand it"); Turkish reads it as incomplete. |
+| 84d5e16a | Tek bir ajan kolaydır. … | Tek bir ajanı yönetmek kolaydır. Birlikte çalışan çok sayıda ajana ise … | Managing a single agent is easy. Many agents working together, however, need … | "Tek bir ajan kolaydır" (*one agent is easy*) is English ellipsis; Turkish names the activity. |
+| d5661343 | … GenSwarms da ajanlar için bunu yapar: … | … GenSwarms aynısını ajanlar için yapar: onları başlatır, … | … GenSwarms does the same for agents: it starts them, … | "Bunu yapar" is a calque of *does that*; "aynısını yapar" is the Turkish idiom. |
+| 2cd90562 | Grafı siz tanımlarsınız. Her mesaj grafa göre kontrol edilir; grafın dışında kalan her şey düşürülür. | Grafı siz tanımlarsınız. Her mesajın bu grafa uyup uymadığı kontrol edilir; uymayan her şey düşürülür. | You define the graph. Every message is checked for whether it fits this graph; anything that doesn't is dropped. | "Grafa göre kontrol edilir" is a calque of *checked against*. |
+| 169c0a3b | Artık çizimler hep aynı sürüyü gösteriyor: … | Bundan sonraki çizimler hep aynı sürüyü gösteriyor: müşterilere Telegram’da yanıt veren bir destek ekibi. | The drawings from here on all show the same swarm: a support team that answers customers on Telegram. | "Artık" also means "anymore", so the line could read as "the drawings now/no longer…". "Bundan sonraki" says *from here on*. |
+| f294f1c2 | Paketler imzalı bir kayda göre doğrulanır. | Paketler imzalı bir kayıt üzerinden doğrulanır. | Packages are verified through a signed log. | "Kayda göre doğrulanır" is a calque of *verified against*. |
+| c2593f94 | Her mesaj, çökme ve yeniden başlatma, canlı. | Her mesaj, çökme ve yeniden başlatma canlı olarak akar. | Every message, crash and restart streams live. | An English-style nominal chain with a trailing adjective; the verb "akar" ties it to "olay akışı". |
+
+Checked and kept: the step headlines ("Her ajan bir süreçtir.", "Sürü bir belgedir.", "Her şey model gerektirmez.", "Ajanlarınıza gerekeni kurun.", "Bunu bir işletim sistemi gibi düşünün." ("bunu bir … gibi düşünün" is ordinary explanatory Turkish), the first two triad lines (OSV focus order), the nav and buttons ("Belgeleri okuyun", "GitHub’da inceleyin"), "organizasyon" (standard in Turkish B2B; switching to Microsoft's "kuruluş" would touch the canvas and six other strings for no gain), "geri gelir" (the canvas and 1024 readout budgets rule out "geri yüklenir"), the comparison cells (sourced), and the guarantees and limits.
+
+Validation: private temp build clean; H1, story steps 2/3/5/9, close, guarantees, spec sheet and footer looked at 1440×900, 1024×768 and 390×844 after the drawing settled; no horizontal scroll; `AUDIT_LANGS=tr i18n-audit.cjs`: ok (tr × 18 sizes).

@@ -15,7 +15,7 @@ Sources read: `README.md`; `docs/architecture.md` (supervision tree); `messaging
 | Concept / object | Source term | What it is | Must stay distinct from | RU | Short form | Avoid | Source |
 |---|---|---|---|---|---|---|---|
 | The analogy | operating system | The computer OS, used as a metaphor for the whole product | platform, framework | операционная система | — (in full everywhere except figure 3's band label, which is «ОС»: see Layout pass) | «платформа», «ОС» in headlines | copy deck v2 "Think of it as an operating system" |
-| The vision | AI workforce(s) | Many agents working as an organization's staff | a swarm/team; labour-market «рабочая сила» | ИИ-персонал («для ИИ-персонала») | — | «рабочая сила ИИ» (labour statistics), «ИИ-сотрудники» (tried first: the plural breaks into «ИИ-сотрудни-ков» in the h1) | concepts.md "staff/personnel of an organization" |
+| The vision | AI workforce(s) | Many agents working as an organization's staff | a swarm/team; labour-market «рабочая сила» | **ИИ-агенты** («для ИИ-агентов»), since the transcreation pass (2026-09-29); was ИИ-персонал | — | «рабочая сила ИИ» (labour statistics), «ИИ-сотрудники» (tried first: the plural breaks into «ИИ-сотрудни-ков» in the h1) | concepts.md "staff/personnel of an organization" |
 | Agent | agent | An LLM-backed worker, run as its own process | object; model | агент; «ИИ-агент» in the meta, the hero lede and the JSON-LD | агент | «бот» | README; Labs «ИИ-агенты» |
 | Object | object | Deterministic code (an Elixir handler) on the same message graph | agent | объект; always glossed as «обычный код» / «детерминированный код» | объект | «сервис» as the noun (the spec row *label* "Services" is «Сервисы», with «объекты: …» after it) | docs/objects.md |
 | Model | model | The LLM an agent calls | agent | модель | — | «нейросеть» | SZC ledger |
@@ -61,7 +61,7 @@ Sources read: `README.md`; `docs/architecture.md` (supervision tree); `messaging
 | Concept | Choice | Why |
 |---|---|---|
 | "operating system" (flagship) | **операционная система**, in full everywhere except figure 3's band label («ОС», see Layout pass) | This is the computer term, and the metaphor needs it. «ОС» would be shorter, but in a headline it reads as jargon. The h1 hyphenates as «Операцион-ная» at 1440px; that is correct Russian hyphenation. |
-| "workforce" | **ИИ-персонал** | «Персонал» is literally the staff of an organization, a collective noun just like "workforce". «Рабочая сила» is labour-market statistics. «ИИ-сотрудники» is warmer, but the plural genitive «ИИ-сотрудников» is too long for the h1 column and broke into five lines with «сотрудни-ков». |
+| "workforce" | **ИИ-персонал** (superseded 2026-09-29 by **ИИ-агенты**, see Transcreation pass) | «Персонал» is literally the staff of an organization, a collective noun just like "workforce". «Рабочая сила» is labour-market statistics. «ИИ-сотрудники» is warmer, but the plural genitive «ИИ-сотрудников» is too long for the h1 column and broke into five lines with «сотрудни-ков». |
 | "runs" (GenSwarms runs the organization / runs agents) | kicker **управляет**; product sentences **запускает / выполняет** | In Russian OS vocabulary «ОС управляет процессами» is the standard technical verb, so it doesn't turn GenSwarms into a human manager. «Запускает организацию» is wrong ("launches"). «Ведёт» / «держит» are vague or colloquial. For programs and agents the verb is «запускает» (meta) and «выполняет» ("An OS runs programs…" becomes «выполняет чужие программы»). |
 | "control" (lede, control layer, Control row) | lede **контролируйте**; layer / row **управление** | "Deploy, coordinate and control" is three imperatives sharing one accusative object, and «контролировать» keeps the English beat. "Control layer" and the Control row are about driving the system, which is «управление». |
 | "plain code", "the same thing every time" | **обычный код**; **каждый раз делают одно и то же** | Unglamorous and deterministic, with no extra technical jargon. «Детерминированный код» appears only in the spec sheet, where the English also says "deterministic". |
@@ -69,7 +69,7 @@ Sources read: `README.md`; `docs/architecture.md` (supervision tree); `messaging
 | "crash" | noun **сбой**, verb **падает / упал** | Russian developers say «процесс упал» but name the event «сбой». The Labs page uses «сбой» too. |
 | "dropped" | **отбрасывается / отброшено** | This is the networking register (packets are «отброшены»). The message is not «потеряно». |
 | "refused" | **отклоняется / отклонено** | A neutral, mechanical rejection by the validator. There is no human "отказ". |
-| Kicker "Models provide intelligence. Agents perform work. GenSwarms runs the organization." | **Модели дают интеллект. Агенты делают работу. GenSwarms управляет организацией.** | Three sentences of three words each: subject, verb, object, all present tense. «Делают работу» replaced «выполняют работу» because the longer line wrapped on desktop and pushed the third beat into the progress rail at 1440×900. It is also blunter, which suits the beat. |
+| Kicker "Models provide intelligence. Agents perform work. GenSwarms runs the organization." | **Модели дают интеллект. Агенты делают работу. GenSwarms управляет организацией.** (superseded 2026-09-29: «Модели отвечают за интеллект. Агенты — за работу. GenSwarms — за организацию.», see Transcreation pass) | Three sentences of three words each: subject, verb, object, all present tense. «Делают работу» replaced «выполняют работу» because the longer line wrapped on desktop and pushed the third beat into the progress rail at 1440×900. It is also blunter, which suits the beat. |
 | "Think of it as an operating system." | **Это как операционная система.** | Short and plain. «Считайте, что это…» and «Думайте о нём как…» are calques. |
 | "Start with one team. Scale to thousands of agents." | **Начните с одной команды. Дорастите до тысяч агентов.** | «Дорасти до» is the native "grow to". «Масштабируйтесь до» is a calque. |
 | "This page ran off the swarm." (404) | **Эта страница отбилась от роя.** | This echoes the idiom «отбиться от стаи» and keeps the joke. |
@@ -131,3 +131,139 @@ I read `/ru/` cold at 1440×900 and 390×844 first, then compared it with the En
 | id | before | after | reason |
 |---|---|---|---|
 | 2caa6242 | операционная система | ОС | Figure 3's band label must fit beside the "GenSwarms" wordmark in the phone drawing; the long form rendered at 9.7–11.6px at 320–375px (audit floor 11/12px). «ОС» is the standard abbreviation, and the step headline next to the drawing spells out «операционная система». |
+
+## Redesign pass (2026-09)
+
+The v4 "zoom" design replaces the SVG figures with one canvas world, adds readouts under it, a legend, a facts row and a zoom caption, and capitalizes the spec rows and the guarantee lists. Every earlier term decision above still holds; none had to change. The per-agent «границы» (boundary) and the band label «ОС» are gone with the old figures: the new drawing says "sandbox", which is «песочница» as before.
+
+### New terms
+
+| Where | English | RU | Why |
+|---|---|---|---|
+| Zoom caption, scale | organization / team / agent | **организация / команда / агент** | One lower-case word each, as in English. «Команда» is the ledger's plain word for one swarm; «организация» matches the triad («управляет организацией»). |
+| Zoom caption, counts | {swarms} swarms · {agents} agents | **роёв: {swarms} · агентов: {agents}** | The counter form («Товаров: 5») avoids number agreement: the world has 2 861 agents, and «2 861 агентов» is wrong (it must be «агент»). 25 characters, within 30. |
+| Layer bar | start · isolate · route · restart | **запуск · изоляция · маршруты · перезапуск** | Nouns: Russian verbs are too long for the bar. «Маршруты» instead of «маршрутизация» to stay near the budget (41 vs 36; «маршрутизация» would be 46 and the bar hides the label on narrow screens, as it does in English at 390px). |
+| Readout rows, keyframe 4 | start / isolate / route / restart + what each means | **запуск / изоляция / маршрутизация / перезапуск** + a genitive continuation («запуск каждого агента как отдельного процесса», «перезапуск упавшего агента его супервизором») | Key and value read as one noun phrase, the way the English reads as one verb phrase. The readout has room for the full «маршрутизация». |
+| Callouts | process / sandbox / supervisor | **процесс / песочница / супервизор** | Ledger terms. |
+| Crash label | crashed → restarted | **упал → перезапущен** | Dev idiom for the process event; the same words in the keyframe-5 readout («агент 10 — упал»). |
+| Readout, others | {n} others · running | **ещё {n} · работают** | «ещё 11» is the short natural count (max 10); «работают» agrees with it. |
+| Agent readout | decides the next step / says what the job is / do the work | **выбирает следующий шаг / ставит задачу / выполняют работу** | «Ставит задачу» is how Russian says what a prompt does. |
+| Wiring readout | who talks to whom / where each one runs / when one fails | **кто с кем общается / где работает каждый / если один упадёт** | Answers: «прописано в каждом агенте» (dev idiom for hard-coded), «там, где его запустили», «его ничто не перезапустит». |
+| Document | log of changes / {n} declared / never logged / defines | **журнал изменений / объявлено: {n} / в журнал не попало / определяет** | «объявлено: 4» avoids agreement after the number; «в журнал не попало» reuses the ledger's «попадает в журнал». |
+| Database note | restores from its database | **восстановление из базы данных** | Noun caption under the cylinder, same noun as the readout row «восстановление». Wraps to two lines of ≤ 20. |
+| Restore order | seed, then changes 1, 2, 3 | **исходное, затем изменения 1, 2, 3** | «Исходное» as in the old monospace restore line; NBSPs keep «изменения 1, 2, 3» together (at 390px the «3» was stranded). |
+| Legend | agent / object / supervisor / message on a declared path | **агент / объект / супервизор / сообщение по объявленному маршруту** | Ledger terms. The last is 34 characters (budget 30); the legend is HTML and wraps exactly as the English does at 1024px. |
+| Facts row | license / version / runtime | **лицензия / версия / среда выполнения** | «Среда выполнения» is the ledger's runtime. The license value is «Открытый код, MIT», as in the meta description. |
+| Readout headings | packages · swarmidx (illustration) / one event stream | **пакеты · swarmidx (иллюстрация) / единый поток событий** | «Единый» as in «Единый слой управления». |
+| Text alternatives | Illustration: … | **Иллюстрация: …** | One per keyframe; agent and object names stay Latin. |
+| Skip link / copy fallback | Skip to content / Selected | **Перейти к содержимому / Выделено** | Standard Russian UI wording. |
+
+### Changes to existing strings
+
+New ids whose English only changed case or punctuation start from the old translation (the "was" id); they are listed here with it.
+
+| id | before | after | reason |
+|---|---|---|---|
+| cad9c020 (was 9967a2e3) | Открытый исходный код, MIT. Версия 0.2.0. | Открытый код, MIT | The facts row splits license and version; the short form matches the meta description. |
+| 7a956af2 (was cf800878) | каждый агент — OTP-процесс под супервизором: роль, модель и бэкенд задаются отдельно | Каждый агент — OTP-процесс под супервизором: роль, модель и бэкенд задаются отдельно. | Capital and full stop, as in the new English. |
+| a7b45c42 (was 760fd5b8) | bwrap, Docker или Apple container для каждого агента | bwrap, Docker или Apple container для каждого агента. | Full stop (bwrap stays lower case, as in English). |
+| b02df163 (was 39386aff) | изолированным агентам доступен только эндпоинт их модели | Изолированным агентам доступен только эндпоинт их модели. | Capital and full stop. |
+| ce5bafa3 (was d55a9496) | только по объявленным маршрутам, с проверкой на каждом шаге | Только по объявленным маршрутам, с проверкой на каждом шаге. | Capital and full stop. |
+| 837e43c3 (was 8403b415) | объекты: детерминированный код на том же графе | Объекты: детерминированный код на том же графе. | Capital and full stop. |
+| 620402be (was fa899489) | gsp и swarmidx: подписаны, адресуются по содержимому, проверяются на вашей машине | gsp и swarmidx: подписаны, адресуются по содержимому, проверяются на вашей машине. | Full stop. |
+| bff34e70 (was 36e77013) | исходное состояние плюс журнал изменений; недопустимые изменения отклоняются; восстановление из базы данных | Исходное состояние плюс журнал изменений. Недопустимые изменения отклоняются. Восстановление из базы данных. | Three sentences, as the English now has. |
+| dfac9de1 (was 3f22753b) | REST, WebSocket, CLI и файл навыка для вашего кодинг-агента | REST, WebSocket, CLI и файл навыка для вашего кодинг-агента. | Full stop. |
+| c2593f94 (was ce64624e) | каждое сообщение, сбой и перезапуск — в реальном времени | Каждое сообщение, сбой и перезапуск — в реальном времени. | Capital and full stop. |
+| 19b6c67d (was 32814eeb) | при сбое перезапускается один агент, а не весь рой | При сбое перезапускается один агент, а не весь рой. | Capital and full stop. |
+| 1de79ed2 (was 90dcde9c) | сообщения идут только по объявленным маршрутам | Сообщения идут только по объявленным маршрутам. | Capital and full stop. |
+| 817dc80f (was b1ae0f2b) | недопустимые конфигурации и изменения отклоняются до запуска | Недопустимые конфигурации и изменения отклоняются до&nbsp;запуска. | Capital and full stop; NBSP after «до» so «запуска.» is not left alone on the second line at 1440px. |
+| f294f1c2 (was 1f16f72f) | пакеты проверяются по подписанному журналу | Пакеты проверяются по подписанному журналу. | Capital and full stop. |
+| bf0dfbad (was 01f18cc0) | один токен оператора, без ролей для отдельных пользователей | Один токен оператора, без ролей для отдельных пользователей. | Capital and full stop. |
+| a1804765 (was 632855ea) | доставка «как минимум один раз», а не «ровно один раз» | Доставка «как минимум один раз», а не «ровно один раз». | Capital and full stop. |
+| c1071d66 (was 163d4e0f) | бюджеты расходов — в отдельном пакете, а не в ядре | Бюджеты расходов — в отдельном пакете, а не в ядре. | Capital and full stop. |
+| 90361c3e (was 7c9e677f) | обновление пакета перезапускает агента; горячей замены пока нет | Обновление пакета перезапускает агента; горячей замены пока нет. | Capital and full stop. |
+| 2944b590 (was e2855769) | по умолчанию 100 агентов на рой (настраивается) | По умолчанию 100 агентов на рой (настраивается). | Capital and full stop. |
+| 0a4470d6 (was 6ce82780) | Перейти к разделу «Как это работает» | Перейти к содержимому | The skip link now jumps to the page's content, not to one section. |
+| c39d7104 (was 4713393e) | Начните с одной команды. Дальше — тысячи агентов. | `<span>Сначала — одна команда.</span> <span>Дальше — тысячи агентов.</span>` | The close headline is now much larger. At 390px, «Начните с одной команды» broke as «Начните с од-/ной команды» (balanced wrapping with hyphenation). «Сначала — одна команда. Дальше — тысячи агентов.» is two parallel beats, breaks only at words, and claims no more than "Start with one team". |
+| 9a976fc2 (was 7b7d0d74) | Выделите и скопируйте | Выделено | The English is now a state ("Selected"), shown on the button after the prompt is selected. |
+| e071ace2 (was 3229609e) | Лицензия | Лицензия (MIT) | The English footer link now names the license. |
+
+No string with an unchanged id was edited. The cold read of `/ru/` found the carried-over copy consistent with the new labels. The step texts, the comparison and the 404 page still read as Russian written by a developer.
+
+### Layout notes (1440×900, 1024×768, 390×844)
+
+- Over budget: «инструменты» (11/10, unchanged id 0284c6ac). At 390px the agent close-up's circle outline runs through its first letter. No shorter Russian word names LLM tools, so it stays. The layer bar (41/36) fits at 1440 and 1024. At 390 it is hidden, as the English one is. The legend (34/30) wraps like the English.
+- Accepted hyphenation (balanced wrapping + `hyphens:auto` on titles, as before): «Это как опера-/ционная система.» (every width), «только по объяв-/ленным маршрутам.» (1440, 1024), «для ИИ-/персонала», «ИИ-/организацией», and «управле-/ния» at 1024. At 1024px the triad's third line breaks «GenSwarms управ-/ляет организацией.». Text can't fix this without changing the kicker. It needs `.triad span{hyphens:manual}` for ru (a page.mjs change, left to the controller).
+- `i18n-audit.cjs` on the built `/ru/`: ok, 18 sizes.
+
+## Final review (2026-09)
+
+A fresh read of `/ru/` as it goes live: every step with the camera settled (and each keyframe forced with `Z.still`), the header and open picker, the sections, the close, the footer, the 404 page and the suggestion bar, at 1440×900, 1024×768, 390×844, 320×640 and 844×390. Then a string-by-string comparison with `en.json`, the meta, og and JSON-LD descriptions and the canvas text alternatives. The copy was already sound: no meaning was dropped or strengthened, the terms match across prose, canvas, readouts, legend and aria-labels, and the honesty rules hold (refusals only over the cap, refused changes never logged, no hot swap). Seven small changes. None makes a string longer on screen except the layer bar, which still shows at exactly the widths it did before (checked at ten widths from 600 to 1440).
+
+| id | before | after | reason |
+|---|---|---|---|
+| 7242d340 | запуск · изоляция · маршруты · перезапуск | запуск · изоляция · маршрутизация · перезапуск | The bar and the readout rows under it name the same four jobs, so they now use the same four action nouns. «Маршруты» named the routes, not routing, and broke the series. The label still fits at 1440 and 1024 and hides at the same widths as before (960×700, 844×390 and phones, as in the old version). |
+| fdf7837b | Части операционной системы и то, чем GenSwarms заполняет каждую из них. | Части операционной системы и то, что GenSwarms предлагает для каждой из них. | «Заполняет» was a calque of "puts in each place". |
+| ffebc746 | …под супервизором, на объявленных маршрутах сообщений, с API на REST и WebSocket и потоком событий в реальном времени. | …под супервизором, с объявленными маршрутами сообщений, API (REST и WebSocket) и потоком событий в реальном времени. | JSON-LD: «с API на REST и WebSocket и потоком» chained two «и», and «на маршрутах» read as if the processes sat on the routes. The list now reads as one list. |
+| b38bce6b | …в контейнере или по SSH | …в контейнере или по⍽SSH | NBSP: at 1024 «по» ended a line. |
+| 57e8c7e2 | …сентябрь 2026 года. | …сентябрь⍽2026⍽года. | NBSPs: at 390 the date split from its month. |
+| 19b6c67d | …а⍽не весь рой. | …а⍽не⍽весь рой. | NBSP: at 390 «а не» ended the line. |
+| a1804765 | …а⍽не «ровно один раз». | …а⍽не⍽«ровно один раз». | Same. |
+
+(⍽ = U+00A0.) Tried and reverted: an NBSP in the step 5 h2 («только по⍽объявленным») to avoid «по» ending a line at 1440. It left «только» alone on a line, which looked worse.
+
+Kept after checking: the meta description's «живой поток событий». It is slightly colloquial, but «в реальном времени» would take it to 169 of 150 characters. «Отклонено: больше 100 агентов» in the swarm document: its meaning is exact, and the aria-label says «сверх лимита». «Документация» in the header: at under 415px the header has no room for it, so phones show only GitHub and the picker (see the report). The hero button «Читать документацию» sits right below it.
+
+Translator doubts (task 5):
+- Hyphenated headlines: most are gone at the current widths. At 1024 the triad now breaks at a word («GenSwarms управляет / организацией.»). What remains is «Это как опера-/ционная система.» at 390 and 320 and «ИИ-/персонала», «ИИ-/организацией» at the compound hyphen, which is legal. No wording fixes the first one without weakening the line, so it goes to the controller as a CSS item (`hyphens:manual` on ru headings).
+- «маршруты» vs «маршрутизация»: **resolved**, now «маршрутизация» in both (see the table).
+- Close headline «Сначала — одна команда. Дальше — тысячи агентов.»: **keep.** It reads as a call to start small, the natural Russian slogan form. The counter «роёв: 36 · агентов: 2 861» is **keep**: it is correct UI Russian and it avoids number agreement. «инструменты» against the circle at 390 is **keep**: with the camera settled it sits just inside the outline. The collision seen at 320×640 and 844×390 also happens in English (see the report).
+
+## Transcreation pass (2026-09-29)
+
+Question asked: where does the page read as translated from English rather than written in Russian? Accuracy was already reviewed three times. This pass changes wording only; no claim is stronger and nothing is dropped. I read `/ru/` cold at 1440×900, 1024×768 and 390×844, then every string against the English. 16 strings changed; the rest already reads like Russian developer copy and is left alone.
+
+### "AI workforce" → «ИИ-агенты» (headline, footer tagline, page title, JSON-LD)
+
+New headline: **«Операционная система для ИИ‑агентов.»** (back-translation: "An operating system for AI agents.")
+
+- **«ИИ-персонал» is dropped.** It is a dictionary rendering of "workforce" (персонал = "staff, personnel", the HR and staffing-agency word), and I found no Russian product page or article that calls AI agents «ИИ-персонал». Read cold, «операционная система для ИИ-персонала» sounds like software for the staff of an AI company. That is the same trap as the Korean «AI 인력».
+- **«ИИ-агенты» is the established term, and it is what people search for.** Examples: trashbox.ru, 2026-08-05, «Представлена Cloudflare OS — открытая „операционная система“ для ИИ-агентов»; vc.ru, «„Операционная система“ для AI-агентов — зачем нужна и кто её строит»; Dasha's Russian page `dasha.ai/ru-ru/agent-os`; the Yandex press release for AI Studio («теперь ИИ-агентов можно создать без навыков разработки»); Sber Business, «ИИ-агенты: что это…». The phrase «операционная система для ИИ-агентов» already exists in Russian tech media for exactly this product category.
+- **Rejected: «цифровые сотрудники» ("digital employees").** It is a real, established phrase (VK AI Space, «платформа цифровых сотрудников»; T-Bank; Vedomosti), but it belongs to enterprise RPA and business-buyer marketing, not developer tools. It would also introduce a second name for what every other string on the page calls «агент».
+- **Rejected: «ИИ-сотрудники».** It is warmer and closer to "workforce", but it is marketing slang, and its genitive broke across five lines of the h1 in the first pass.
+- **Rejected: «ваших ИИ-агентов» (the Spanish "tus agentes de IA").** Russian headlines rarely use possessives. «для ИИ-агентов» reads as the category name, as the English "for AI workforces" does.
+- **What is lost:** the "workforce" image (agents as an organization's staff). This is the same trade-off Spanish made. The lead keeps it: «…тысячи ИИ-агентов по всей организации».
+- **Prefix ИИ vs AI:** both are current (Yandex's blog writes «AI-агенты», its press releases write «ИИ-агентов»). The page already uses «ИИ-» in more than 20 places, so it stays.
+- **Typography:** the h1 writes the compound with U+2011 (non-breaking hyphen), «ИИ‑агентов». With a plain hyphen, the balanced wrap broke it as «ИИ-/агентов.» at 1440, 1280 and 768, and a trailing &nbsp; after «для» stranded the full stop on landscape phones (audit failure at 844×390). Geist Mono draws U+2011 pixel-identical to «-» (checked on a canvas). Now the h1 breaks «Операционная / система для / ИИ‑агентов.» at every width from 360 to 1440, and «…система / для ИИ‑агентов.» at 320. Title, meta, JSON-LD and footer use the plain hyphen, so the indexed text matches the search query.
+
+### Changes
+
+(⍽ = U+00A0, ‑ = U+2011)
+
+| id | before | after | back-translation of after | why the before read as translated |
+|---|---|---|---|---|
+| 3b3ae940 | Операционная система для&nbsp;ИИ-персонала. | Операционная система для ИИ‑агентов. | An operating system for AI agents. | «ИИ-персонал» is a word-for-word "AI workforce" that no Russian product uses; it reads as "the staff of an AI company". See above. |
+| 37294ee3 | Операционная система для ИИ-персонала. | Операционная система для ИИ-агентов. | An operating system for AI agents. | Same term, footer tagline. |
+| 836e01a9 | GenSwarms⍽— операционная система для ИИ-персонала | GenSwarms⍽— операционная система для ИИ-агентов | GenSwarms — an operating system for AI agents | Same term, page title. It now matches the search phrase «операционная система для ИИ-агентов». |
+| ffebc746 | Операционная система для ИИ-персонала: запускает ИИ-агентов как отдельные процессы… | Операционная система для ИИ-агентов: запускает их как отдельные процессы… (rest unchanged) | An operating system for AI agents: runs them as separate processes under a supervisor, with declared message routes, an API (REST and WebSocket) and a real-time event stream. | Same term, JSON-LD. «их» ("them") avoids repeating «ИИ-агентов» three words later. |
+| 41acb76d | Единый слой управления ИИ-организацией. | Единый слой управления всеми вашими агентами. | A single control layer for all your agents. | «ИИ-организация» is a calque of "AI organization". It is not a Russian collocation, and it reads as "an AI company". |
+| a0b063e5 | Модели дают интеллект. | Модели отвечают за интеллект. | Models are responsible for intelligence. | «Дают интеллект» / «делают работу» copy "provide" / "perform" verb by verb and don't sound like Russian. Russian states a division of labour as «X отвечает за Y, Z — за W». |
+| a34eb019 | Агенты делают работу. | Агенты⍽— за работу. | Agents — for the work. | Second beat of the same construction (the dash stands for «отвечают»). |
+| 86d0513d | GenSwarms управляет организацией. | GenSwarms⍽— за организацию. | GenSwarms — for the organization. | Third beat. «Управляет организацией» read as "manages the company" (a director's job). «Отвечает за организацию» keeps both readings of "runs the organization": being in charge of it and organizing it. |
+| ccb7b646 | Не всему нужна модель. | Модель нужна не везде. | A model is not needed everywhere. | «Не всему нужна…» keeps the English subject "Not everything". In Russian the thing that is needed is the subject. |
+| 84d5e16a | …правила общения и⍽способ вернуться в⍽строй, если один упадёт. | …правила общения и⍽способ поднять упавшего. | …rules of communication and a way to bring the fallen one back up. | "A way back when one fails" was carried over as «способ вернуться в строй, если один упадёт», and the subjects don't match: "they" need a way to return if "one" falls. «Поднять» is the dev verb for bringing a service back up («поднять сервис»). |
+| d5661343 | GenSwarms делает то же самое для агентов: … | GenSwarms делает то же самое с⍽агентами: … | GenSwarms does the same thing with agents: starts them, isolates them, routes their messages and restarts them after a failure. | «Делает … для агентов» is "does for agents", which in Russian means "on their behalf". An OS does these things *with* the programs it runs. |
+| 3407f33c | Установите то, что нужно вашим агентам. | Установите то, что нужно агентам. | Install what the agents need. | «Вашим» copies the English "your". Russian leaves out the possessive when the owner is obvious, so the meaning is the same. |
+| 1880c1e0 | Коннекторы…, браузер, планировщик: подписанные пакеты из реестра swarmidx, которые проверяются перед загрузкой. | Коннекторы…, браузер, планировщик⍽— всё это подписанные пакеты из реестра swarmidx, и⍽каждый проверяется перед загрузкой. | Connectors for Telegram, WhatsApp and email, a browser, a scheduler — all of these are signed packages from the swarmidx registry, and each is checked before it loads. | The English list-colon-apposition pattern. Russian sums up a list with «— всё это…». |
+| fdf7837b | Части операционной системы и⍽то, что GenSwarms предлагает для каждой из них. | Из чего состоит операционная система и⍽что GenSwarms предлагает для каждой части. | What an operating system is made of, and what GenSwarms offers for each part. | An English-style chain of nouns («Части … и то, что … для каждой из них»). Russian says it with two indirect questions. |
+| c6918e94 | Чем это отличается от LangGraph, CrewAI или AutoGen? | Чем GenSwarms отличается от LangGraph, CrewAI и⍽AutoGen? | How does GenSwarms differ from LangGraph, CrewAI and AutoGen? | «Это» renders the English "it", which a Russian heading wouldn't use. The name also matches how people search («чем X отличается от Y»). «или» → «и» is the usual form of a comparison list. |
+| d09cd058 | Что входит в⍽версию 0.2.0 сегодня и⍽о⍽каких ограничениях мы знаем. | Что уже есть в⍽версии 0.2.0 и⍽какие ограничения нам известны. | What is already in version 0.2.0, and which limits are known to us. | «Входит … сегодня» copies "ships … today", and «о каких ограничениях мы знаем» keeps the English order of "the limits we know about". |
+
+Considered and kept: the lead «Развёртывайте, координируйте и контролируйте…» (a normal Russian marketing triple); «Это как операционная система.»; «Граф задаёте вы. Каждое сообщение сверяется с ним…» («сверяется» is the native "checked against"); «вне графа»; «Или поручите это своему агенту:» and «поручите это своему кодинг-агенту» (natural "hand it to"); «Сначала — одна команда. Дальше — тысячи агентов.»; the nav and buttons; the comparison cells (sourced, and they already read naturally); the guarantees; the readouts and canvas labels.
+
+### Layout and checks
+
+- Built into a private temp dir and served on :8864. Looked at the hero, steps 2, 3, 6, 7 and 9, the triad, the section headings, the compare table and the footer at 1440×900, 1024×768 and 390×844, waiting 3 s before each screenshot. No page is wider than its viewport.
+- Triad: one line per beat at 1440 and 390. At 1024 the first and third beats wrap at a word («Модели отвечают / за интеллект.», «GenSwarms — за / организацию.»), with no hyphenation. Before, only the third beat wrapped there. Now two beats wrap, which is the one layout cost of this pass.
+- `AUDIT_LANGS=ru i18n-audit.cjs`: **ok, 18 sizes**. The first run failed at 844×390, where a &nbsp; after «для» stranded the full stop; the &nbsp; is now gone.
+- The share image `og-ru.png` draws the h1, so it must be re-rendered (`tools/og.cjs`) when this is built into `website/`, or `--check` fails.
