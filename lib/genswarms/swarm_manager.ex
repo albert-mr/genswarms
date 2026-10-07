@@ -13,6 +13,7 @@ defmodule Genswarms.SwarmManager do
   require Logger
 
   alias Genswarms.Agents.{AgentSupervisor, AgentServer}
+  alias Genswarms.Backends.DockerBackend
   alias Genswarms.Observability.LogStore
   alias Genswarms.Config.{Loader, SwarmConfig}
   alias Genswarms.Objects.ObjectSupervisor
@@ -901,17 +902,8 @@ defmodule Genswarms.SwarmManager do
   end
 
   defp do_pause_containers(swarm_name) do
-    prefix = "szc-#{swarm_name}-"
-
-    case System.cmd("docker", ["ps", "--filter", "name=#{prefix}", "--format", "{{.Names}}"],
-           stderr_to_stdout: true
-         ) do
-      {output, 0} ->
-        containers =
-          output
-          |> String.split("\n", trim: true)
-          |> Enum.filter(&String.starts_with?(&1, prefix))
-
+    case DockerBackend.swarm_containers(swarm_name, :running) do
+      {:ok, containers} ->
         if containers == [] do
           {:ok, 0}
         else
@@ -926,33 +918,14 @@ defmodule Genswarms.SwarmManager do
           {:ok, Enum.count(results, &(&1 == :ok))}
         end
 
-      {err, _} ->
+      {:error, err} ->
         {:error, err}
     end
   end
 
   defp do_resume_containers(swarm_name) do
-    prefix = "szc-#{swarm_name}-"
-
-    case System.cmd(
-           "docker",
-           [
-             "ps",
-             "--filter",
-             "name=#{prefix}",
-             "--filter",
-             "status=paused",
-             "--format",
-             "{{.Names}}"
-           ],
-           stderr_to_stdout: true
-         ) do
-      {output, 0} ->
-        containers =
-          output
-          |> String.split("\n", trim: true)
-          |> Enum.filter(&String.starts_with?(&1, prefix))
-
+    case DockerBackend.swarm_containers(swarm_name, :paused) do
+      {:ok, containers} ->
         if containers == [] do
           {:ok, 0}
         else
@@ -967,7 +940,7 @@ defmodule Genswarms.SwarmManager do
           {:ok, Enum.count(results, &(&1 == :ok))}
         end
 
-      {err, _} ->
+      {:error, err} ->
         {:error, err}
     end
   end
@@ -1667,27 +1640,8 @@ defmodule Genswarms.SwarmManager do
   end
 
   defp check_containers_paused(swarm_name) do
-    prefix = "szc-#{swarm_name}-"
-
-    case System.cmd(
-           "docker",
-           [
-             "ps",
-             "--filter",
-             "name=#{prefix}",
-             "--filter",
-             "status=paused",
-             "--format",
-             "{{.Names}}"
-           ],
-           stderr_to_stdout: true
-         ) do
-      {output, 0} ->
-        containers =
-          output
-          |> String.split("\n", trim: true)
-          |> Enum.filter(&String.starts_with?(&1, prefix))
-
+    case DockerBackend.swarm_containers(swarm_name, :paused) do
+      {:ok, containers} ->
         length(containers) > 0
 
       _ ->

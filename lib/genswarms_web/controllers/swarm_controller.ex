@@ -8,7 +8,7 @@ defmodule GenswarmsWeb.SwarmController do
   alias Genswarms.SwarmManager
   alias Genswarms.Agents.{AgentServer, AgentSupervisor}
   alias Genswarms.Config.{Loader, SwarmConfig}
-  alias Genswarms.Backends.OciCli
+  alias Genswarms.Backends.{DockerBackend, OciCli}
   alias Genswarms.Objects.{ObjectSupervisor, ObjectServer}
   alias Genswarms.Routing.Router
   alias Genswarms.CLI.{DaemonBridge, SwarmRegistry}
@@ -812,7 +812,7 @@ defmodule GenswarmsWeb.SwarmController do
 
     case SwarmRegistry.get_swarm(name) do
       {:ok, swarm} ->
-        prefix
+        name
         |> list_docker_containers()
         |> Enum.each(fn container ->
           docker_cmd(["stop", container])
@@ -834,12 +834,10 @@ defmodule GenswarmsWeb.SwarmController do
     end
   end
 
-  defp list_docker_containers(prefix) do
-    case docker_cmd(["ps", "-a", "--filter", "name=#{prefix}", "--format", "{{.Names}}"]) do
-      {output, 0} ->
-        output
-        |> String.split("\n", trim: true)
-        |> Enum.filter(&String.starts_with?(&1, prefix))
+  defp list_docker_containers(swarm_name) do
+    case DockerBackend.swarm_containers(swarm_name, :all) do
+      {:ok, containers} ->
+        containers
 
       _ ->
         []
@@ -871,17 +869,8 @@ defmodule GenswarmsWeb.SwarmController do
   defp apple_container_cmd(args), do: OciCli.cmd("container", args)
 
   defp pause_containers(swarm_name) do
-    prefix = "szc-#{swarm_name}-"
-
-    case System.cmd("docker", ["ps", "--filter", "name=#{prefix}", "--format", "{{.Names}}"],
-           stderr_to_stdout: true
-         ) do
-      {output, 0} ->
-        containers =
-          output
-          |> String.split("\n", trim: true)
-          |> Enum.filter(&String.starts_with?(&1, prefix))
-
+    case DockerBackend.swarm_containers(swarm_name, :running) do
+      {:ok, containers} ->
         count =
           Enum.reduce(containers, 0, fn container, acc ->
             case System.cmd("docker", ["pause", container], stderr_to_stdout: true) do
@@ -898,27 +887,8 @@ defmodule GenswarmsWeb.SwarmController do
   end
 
   defp resume_containers(swarm_name) do
-    prefix = "szc-#{swarm_name}-"
-
-    case System.cmd(
-           "docker",
-           [
-             "ps",
-             "--filter",
-             "name=#{prefix}",
-             "--filter",
-             "status=paused",
-             "--format",
-             "{{.Names}}"
-           ],
-           stderr_to_stdout: true
-         ) do
-      {output, 0} ->
-        containers =
-          output
-          |> String.split("\n", trim: true)
-          |> Enum.filter(&String.starts_with?(&1, prefix))
-
+    case DockerBackend.swarm_containers(swarm_name, :paused) do
+      {:ok, containers} ->
         count =
           Enum.reduce(containers, 0, fn container, acc ->
             case System.cmd("docker", ["unpause", container], stderr_to_stdout: true) do
