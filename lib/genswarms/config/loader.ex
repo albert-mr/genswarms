@@ -17,6 +17,8 @@ defmodule Genswarms.Config.Loader do
   """
   @spec load(String.t()) :: {:ok, SwarmConfig.t()} | {:error, term()}
   def load(path) do
+    Code.ensure_loaded!(SwarmConfig)
+
     expanded_path = Path.expand(path)
 
     # Match application startup: tests and embedded callers can disable dotenv.

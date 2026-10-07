@@ -168,6 +168,50 @@ defmodule Genswarms.Config.LoaderTest do
   end
 
   describe "load/1" do
+    for format <- ~w(json yaml), backend <- ~w(mock apple_container) do
+      @tag :tmp_dir
+      test "loads a #{format} file with #{backend} in a fresh VM", %{tmp_dir: dir} do
+        backend = unquote(backend)
+        path = Path.join(dir, "config.#{unquote(format)}")
+
+        content =
+          case unquote(format) do
+            "json" ->
+              Jason.encode!(%{name: "fresh", agents: [%{name: "worker", backend: backend}]})
+
+            "yaml" ->
+              "name: fresh\nagents:\n  - name: worker\n    backend: #{backend}\n"
+          end
+
+        File.write!(path, content)
+
+        # The test VM has already loaded backend atoms. Keep them out of the
+        # child script so only the loader can make valid backend names available.
+        reader = ~S"""
+        [path, expected_backend] = System.argv()
+        false = :code.is_loaded(Genswarms.Config.SwarmConfig)
+        Application.put_env(:genswarms, :load_dotenv, false)
+        {:ok, config} = Genswarms.Config.Loader.load(path)
+        ^expected_backend = Atom.to_string(hd(config.agents).backend)
+        IO.puts("CONFIG_LOADED")
+        """
+
+        code_paths =
+          Path.wildcard(Path.join(Mix.Project.build_path(), "lib/*/ebin"))
+          |> Enum.flat_map(&["-pa", &1])
+
+        {output, status} =
+          System.cmd(
+            System.find_executable("elixir"),
+            code_paths ++ ["-e", reader, "--", path, backend],
+            stderr_to_stdout: true
+          )
+
+        assert status == 0, output
+        assert output =~ "CONFIG_LOADED"
+      end
+    end
+
     test "returns error for non-existent file" do
       assert {:error, {:file_not_found, _}} = Loader.load("/nonexistent/path.exs")
     end
