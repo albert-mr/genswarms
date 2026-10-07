@@ -7,7 +7,7 @@ defmodule GenswarmsWeb.SwarmController do
 
   alias Genswarms.SwarmManager
   alias Genswarms.Agents.{AgentServer, AgentSupervisor}
-  alias Genswarms.Config.SwarmConfig
+  alias Genswarms.Config.{Loader, SwarmConfig}
   alias Genswarms.Backends.OciCli
   alias Genswarms.Objects.{ObjectSupervisor, ObjectServer}
   alias Genswarms.Routing.Router
@@ -30,7 +30,15 @@ defmodule GenswarmsWeb.SwarmController do
   Body: { "config": { ... } } or { "config_path": "path/to/config.exs" }
   """
   def create(conn, %{"ir" => document}) do
-    case SwarmManager.start_from_ir(document) do
+    result =
+      with {:ok, ir} <- Genswarms.IR.State.parse(document),
+           true <- Enum.all?(ir.agents ++ ir.objects, &(safe_atom(&1.name) != nil)) do
+        SwarmManager.start_from_ir(document)
+      else
+        _ -> {:error, :unknown_name}
+      end
+
+    case result do
       {:ok, name} ->
         conn |> put_status(:created) |> json(%{status: "created", swarm_name: name})
 
@@ -40,7 +48,10 @@ defmodule GenswarmsWeb.SwarmController do
   end
 
   def create(conn, %{"config" => config}) do
-    case SwarmManager.start_from_config(config) do
+    result =
+      with {:ok, parsed} <- Loader.load_map(config), do: SwarmManager.start_from_config(parsed)
+
+    case result do
       {:ok, swarm_name} ->
         conn
         |> put_status(:created)
@@ -344,11 +355,13 @@ defmodule GenswarmsWeb.SwarmController do
   Body: { "from": "agent1", "to": "agent2", "content": "message" }
   """
   def route_message(conn, %{"name" => name, "from" => from, "to" => to, "content" => content}) do
-    from_atom = String.to_atom(from)
-    to_atom = String.to_atom(to)
-
-    Router.route(name, from_atom, to_atom, content)
-    json(conn, %{status: "routed", from: from, to: to, swarm: name})
+    with from_atom when not is_nil(from_atom) <- safe_atom(from),
+         to_atom when not is_nil(to_atom) <- safe_atom(to) do
+      Router.route(name, from_atom, to_atom, content)
+      json(conn, %{status: "routed", from: from, to: to, swarm: name})
+    else
+      _ -> conn |> put_status(:bad_request) |> json(%{error: "Unknown message endpoint"})
+    end
   end
 
   def route_message(conn, _params) do
@@ -422,7 +435,7 @@ defmodule GenswarmsWeb.SwarmController do
   GET /api/swarms/:swarm_name/agents/:agent_name
   """
   def show_agent(conn, %{"swarm_name" => swarm_name, "agent_name" => agent_name}) do
-    agent_name = String.to_atom(agent_name)
+    agent_name = String.to_existing_atom(agent_name)
 
     case AgentServer.get_status(swarm_name, agent_name) do
       status when is_map(status) ->
@@ -617,9 +630,8 @@ defmodule GenswarmsWeb.SwarmController do
   GET /api/swarms/:swarm_name/agents/:agent_name/logs
   """
   def agent_logs(conn, %{"swarm_name" => swarm_name, "agent_name" => agent_name}) do
-    agent_name = String.to_atom(agent_name)
-
     try do
+      agent_name = String.to_existing_atom(agent_name)
       logs = AgentServer.get_logs(swarm_name, agent_name)
       json(conn, %{logs: logs})
     rescue
@@ -636,10 +648,10 @@ defmodule GenswarmsWeb.SwarmController do
   GET /api/swarms/:swarm_name/agents/:agent_name/history
   """
   def agent_history(conn, %{"swarm_name" => swarm_name, "agent_name" => agent_name} = params) do
-    agent_name = String.to_atom(agent_name)
     limit = Map.get(params, "limit", "100") |> String.to_integer()
 
     try do
+      agent_name = String.to_existing_atom(agent_name)
       history = AgentServer.get_history(swarm_name, agent_name, limit)
       json(conn, %{history: history})
     rescue
@@ -656,9 +668,8 @@ defmodule GenswarmsWeb.SwarmController do
   GET /api/swarms/:swarm_name/agents/:agent_name/skills
   """
   def agent_skills(conn, %{"swarm_name" => swarm_name, "agent_name" => agent_name}) do
-    agent_name = String.to_atom(agent_name)
-
     try do
+      agent_name = String.to_existing_atom(agent_name)
       skills = AgentServer.get_skills_content(swarm_name, agent_name)
       json(conn, %{skills: skills})
     rescue
@@ -681,7 +692,7 @@ defmodule GenswarmsWeb.SwarmController do
         "skill_name" => skill_name,
         "content" => content
       }) do
-    agent_name_atom = String.to_atom(agent_name)
+    agent_name_atom = String.to_existing_atom(agent_name)
 
     case AgentServer.update_skill(swarm_name, agent_name_atom, skill_name, content) do
       :ok ->
@@ -697,6 +708,8 @@ defmodule GenswarmsWeb.SwarmController do
         |> put_status(:internal_server_error)
         |> json(%{error: format_error(reason)})
     end
+  rescue
+    ArgumentError -> conn |> put_status(:not_found) |> json(%{error: "Agent not found"})
   end
 
   # Private helpers
@@ -1053,13 +1066,17 @@ defmodule GenswarmsWeb.SwarmController do
   Body: { "add": [["from","to"], ...], "remove": [...] }
   """
   def patch_topology(conn, %{"swarm_name" => swarm} = params) do
-    add = Map.get(params, "add", []) |> Enum.map(&parse_edge/1) |> Enum.reject(&is_nil/1)
-    remove = Map.get(params, "remove", []) |> Enum.map(&parse_edge/1) |> Enum.reject(&is_nil/1)
+    add = Map.get(params, "add", []) |> Enum.map(&parse_edge/1)
+    remove = Map.get(params, "remove", []) |> Enum.map(&parse_edge/1)
 
-    with :ok <- maybe_op(add, &SwarmManager.add_topology_edges(swarm, &1, persist: true)),
+    with false <- Enum.any?(add ++ remove, &is_nil/1),
+         :ok <- maybe_op(add, &SwarmManager.add_topology_edges(swarm, &1, persist: true)),
          :ok <- maybe_op(remove, &SwarmManager.remove_topology_edges(swarm, &1, persist: true)) do
       json(conn, %{status: "ok", added: length(add), removed: length(remove)})
     else
+      true ->
+        conn |> put_status(:bad_request) |> json(%{error: "Invalid or unknown topology endpoint"})
+
       {:error, reason} ->
         conn |> put_status(:bad_request) |> json(%{error: format_error(reason)})
     end
@@ -1073,7 +1090,12 @@ defmodule GenswarmsWeb.SwarmController do
     {opts, spec_params} = extract_topology_opts(params)
     spec = parse_agent_spec(spec_params)
 
-    case SwarmManager.add_agent(swarm, spec, Keyword.put(opts, :persist, true)) do
+    result =
+      if is_nil(spec.name),
+        do: {:error, :unknown_name},
+        else: SwarmManager.add_agent(swarm, spec, Keyword.put(opts, :persist, true))
+
+    case result do
       {:ok, name} ->
         conn |> put_status(:created) |> json(%{status: "added", name: name})
 
@@ -1101,7 +1123,17 @@ defmodule GenswarmsWeb.SwarmController do
   """
   def scale_agent_group(conn, %{"swarm_name" => swarm, "base_name" => base, "count" => count})
       when is_integer(count) and count >= 0 do
-    case SwarmManager.scale_agent_group(swarm, base, count, persist: true) do
+    result =
+      with {:ok, config} <- SwarmManager.get_full_config(swarm),
+           :ok <- Genswarms.IR.Gate.validate_scale(config, base, count),
+           true <- count == 0 or Enum.all?(1..count, &(safe_atom("#{base}_#{&1}") != nil)) do
+        SwarmManager.scale_agent_group(swarm, base, count, persist: true)
+      else
+        false -> {:error, :unknown_name}
+        error -> error
+      end
+
+    case result do
       {:ok, result} ->
         json(conn, %{status: "ok", result: serialize_scale_result(result)})
 
@@ -1129,7 +1161,12 @@ defmodule GenswarmsWeb.SwarmController do
       |> put_status(:bad_request)
       |> json(%{error: "Invalid or missing object handler"})
     else
-      case SwarmManager.add_object(swarm, spec, Keyword.put(opts, :persist, true)) do
+      result =
+        if is_nil(spec.name),
+          do: {:error, :unknown_name},
+          else: SwarmManager.add_object(swarm, spec, Keyword.put(opts, :persist, true))
+
+      case result do
         {:ok, name} ->
           conn |> put_status(:created) |> json(%{status: "added", name: name})
 
@@ -1252,11 +1289,14 @@ defmodule GenswarmsWeb.SwarmController do
   defp maybe_op(items, fun), do: fun.(items)
 
   defp parse_edge([from, to]) when is_binary(from) and is_binary(to) do
-    {String.to_atom(from), String.to_atom(to)}
+    case {safe_atom(from), safe_atom(to)} do
+      {f, t} when not is_nil(f) and not is_nil(t) -> {f, t}
+      _ -> nil
+    end
   end
 
   defp parse_edge(%{"from" => from, "to" => to}) when is_binary(from) and is_binary(to) do
-    {String.to_atom(from), String.to_atom(to)}
+    parse_edge([from, to])
   end
 
   defp parse_edge(_), do: nil
@@ -1335,7 +1375,7 @@ defmodule GenswarmsWeb.SwarmController do
     try do
       String.to_existing_atom(s)
     rescue
-      ArgumentError -> String.to_atom(s)
+      ArgumentError -> nil
     end
   end
 

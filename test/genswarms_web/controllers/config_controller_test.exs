@@ -38,6 +38,24 @@ defmodule GenswarmsWeb.ConfigControllerTest do
     refute File.exists?(marker), "RCE: .exs request content was executed by the controller"
   end
 
+  test "request config paths outside the operator config directory are rejected" do
+    path =
+      Path.join(System.tmp_dir!(), "config_request_#{System.unique_integer([:positive])}.json")
+
+    name = "path_unknown_#{System.unique_integer([:positive])}"
+
+    File.write!(
+      path,
+      Jason.encode!(%{name: "path-test", agents: [%{name: name, backend: "mock"}]})
+    )
+
+    on_exit(fn -> File.rm(path) end)
+
+    conn = post_validate(%{"config_path" => path})
+    assert conn.status == 400
+    assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
+  end
+
   test "accepts a valid JSON content config" do
     content = ~s|{"name":"n","agents":[{"name":"a","backend":"local"}],"topology":[]}|
     conn = post_validate(%{"content" => content, "format" => "json"})

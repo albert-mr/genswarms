@@ -10,6 +10,18 @@ All routes are defined in `lib/genswarms_web/router.ex` and implemented by the c
 
 ## Base URL and conventions
 
+HTTP request bodies use node names that already exist as atoms in the server VM,
+normally introduced by trusted local configuration or compiled code. Inline
+config/IR creation, dynamic agent/object creation, topology edits, and scaling
+cannot introduce new names; fresh names return `400`. To introduce names, load
+an operator-controlled config file through the CLI or an allowed `config_path`.
+Scaling over HTTP also requires each derived `base_1`, `base_2`, etc. name to
+already exist. Trusted programmatic configuration and scaling retain support
+for new names.
+
+Unknown nested configuration keys remain strings. Event filters also remain
+strings, so querying an unknown name returns no matching events.
+
 Native IR creation accepts `POST /api/swarms` with `{"ir": <swarm.state>}`.
 `POST /api/swarms/:name/restore` restores a stopped native swarm from SQLite
 (404 without a seed, 409 on failed recovery or an already-running swarm).

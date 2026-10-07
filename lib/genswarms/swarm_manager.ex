@@ -91,7 +91,7 @@ defmodule Genswarms.SwarmManager do
   """
   @spec send_task(String.t(), atom() | String.t(), String.t()) :: :ok | {:error, term()}
   def send_task(swarm_name, agent_name, task) do
-    agent_name = if is_binary(agent_name), do: String.to_atom(agent_name), else: agent_name
+    agent_name = normalize_name(agent_name)
     AgentServer.send_task(swarm_name, agent_name, task)
   end
 
@@ -236,7 +236,12 @@ defmodule Genswarms.SwarmManager do
   end
 
   defp normalize_name(name) when is_atom(name), do: name
-  defp normalize_name(name) when is_binary(name), do: String.to_atom(name)
+
+  defp normalize_name(name) when is_binary(name) do
+    String.to_existing_atom(name)
+  rescue
+    ArgumentError -> name
+  end
 
   @doc """
   Returns the effective in-memory SwarmConfig for a swarm (seed ⊕ overlay).
@@ -1531,7 +1536,7 @@ defmodule Genswarms.SwarmManager do
   defp spec_has_name?(spec, name) do
     case Map.get(spec, :name) do
       ^name -> true
-      n when is_binary(n) -> String.to_atom(n) == name
+      n when is_binary(n) -> n == to_string(name)
       _ -> false
     end
   end
@@ -1540,7 +1545,7 @@ defmodule Genswarms.SwarmManager do
 
   defp find_template_spec(agents, base_name) do
     # Prefer `base_name_1`, fall back to `base_name`, fall back to any `base_name_*`
-    Enum.find(agents, &spec_has_name?(&1, :"#{base_name}_1")) ||
+    Enum.find(agents, &(to_string(&1.name) == "#{base_name}_1")) ||
       Enum.find(agents, &spec_has_name?(&1, base_name)) ||
       Enum.find(agents, fn spec ->
         n = Map.get(spec, :name) |> to_string()

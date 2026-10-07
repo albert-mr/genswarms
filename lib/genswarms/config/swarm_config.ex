@@ -204,6 +204,34 @@ defmodule Genswarms.Config.SwarmConfig do
 
   def parse(_), do: {:error, :invalid_config_format}
 
+  @doc "Parses request configuration using existing node names only. Local files may declare new names."
+  def parse_existing(config) when is_map(config) do
+    config
+    |> Map.update(:agents, nil, &existing_specs/1)
+    |> Map.update(:objects, [], &existing_specs/1)
+    |> Map.update(
+      :topology,
+      [],
+      &Enum.map(&1, fn
+        {from, to} -> {existing_name!(from), existing_name!(to)}
+        edge -> edge
+      end)
+    )
+    |> parse()
+  rescue
+    ArgumentError -> {:error, :unknown_name}
+    _ -> {:error, :invalid_config_format}
+  end
+
+  def parse_existing(_), do: {:error, :invalid_config_format}
+
+  defp existing_specs(specs) do
+    Enum.map(specs, fn spec -> Map.update!(spec, :name, &existing_name!/1) end)
+  end
+
+  defp existing_name!(name) when is_atom(name), do: name
+  defp existing_name!(name) when is_binary(name), do: String.to_existing_atom(name)
+
   @doc """
   Builds an adjacency map from the topology edges.
 

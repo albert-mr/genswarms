@@ -137,8 +137,9 @@ host.
 
 ## API config-path restriction
 
-`POST /api/swarms {"config_path": "..."}` loads a server-side file. The path is
-restricted to a directory:
+`POST /api/swarms {"config_path": "..."}` and
+`POST /api/config/validate {"config_path": "..."}` load a server-side file.
+The path is restricted to a directory:
 
 | Variable | Default | Effect |
 |----------|---------|--------|
@@ -146,6 +147,12 @@ restricted to a directory:
 
 Paths that escape (absolute or `..` traversal) are rejected with `400`. The CLI
 is operator-run and unrestricted.
+
+This directory is a trust boundary: keep its files and symlink targets under
+operator control, outside agent-writable workspaces. The path guard checks
+lexical containment; it does not resolve symlinks. Local files may declare new
+node names and executable `.exs` configuration; HTTP request bodies may only
+use names already present in the server VM.
 
 ## Behavior changes to be aware of
 
