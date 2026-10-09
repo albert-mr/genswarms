@@ -64,6 +64,22 @@ defmodule GenswarmsWeb.ConfigControllerTest do
     assert %{"valid" => true} = Jason.decode!(conn.resp_body)
   end
 
+  test "validation of fresh names does not intern them or consume the dynamic budget" do
+    before = Genswarms.Config.RequestNames.allocated()
+    name = "validate_fresh_#{System.unique_integer([:positive])}"
+    config = %{"name" => "validate-dynamic", "agents" => [%{"name" => name, "backend" => "mock"}]}
+
+    for params <- [
+          %{"config" => config},
+          %{"content" => Jason.encode!(config), "format" => "json"}
+        ] do
+      conn = post_validate(params)
+      assert conn.status == 200
+      assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
+      assert Genswarms.Config.RequestNames.allocated() == before
+    end
+  end
+
   test "accepts Apple container scalar backend in JSON content" do
     content = ~s|{"name":"n","agents":[{"name":"a","backend":"apple_container"}],"topology":[]}|
     conn = post_validate(%{"content" => content, "format" => "json"})

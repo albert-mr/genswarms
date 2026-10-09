@@ -10,14 +10,24 @@ All routes are defined in `lib/genswarms_web/router.ex` and implemented by the c
 
 ## Base URL and conventions
 
-HTTP request bodies use node names that already exist as atoms in the server VM,
-normally introduced by trusted local configuration or compiled code. Inline
-config/IR creation, dynamic agent/object creation, topology edits, and scaling
-cannot introduce new names; fresh names return `400`. To introduce names, load
-an operator-controlled config file through the CLI or an allowed `config_path`.
-Scaling over HTTP also requires each derived `base_1`, `base_2`, etc. name to
-already exist. Trusted programmatic configuration and scaling retain support
-for new names.
+HTTP node creation uses the server's [name admission policy](security.md#http-node-name-policy).
+By default, inline config/IR creation, dynamic agent/object creation and scaling
+may declare new names, up to **10,000 new names over the server VM's lifetime**.
+Names must start with a letter, contain only letters/digits/underscore/hyphen,
+and be at most 255 bytes. Reusing a name costs nothing; deleting nodes or swarms
+does not refund capacity. A scale batch that would exceed the budget returns
+`400` with `{"error":"dynamic_name_limit_reached"}` before changing the group.
+
+Set `GENSWARMS_RESTRICTED_NAMES=true` to require names already present as atoms
+in that server VM. Fresh names then return `400` (`restricted_names`), including
+derived replica names such as `worker_1`. A CLI running in a different VM does
+not register names in the API server. Trusted local/programmatic configuration
+and scaling retain support for new names in both modes.
+
+Routing, lookups, filters and topology edits never declare names, in either mode.
+Inline JSON/YAML config validation checks the policy and available budget without
+allocating names or reserving capacity; a subsequent creation may still fail if
+other requests have used the remaining budget.
 
 Unknown nested configuration keys remain strings. Event filters also remain
 strings, so querying an unknown name returns no matching events.

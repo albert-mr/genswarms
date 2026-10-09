@@ -34,23 +34,27 @@ defmodule Genswarms.Config.Loader do
 
   @doc """
   Loads configuration from a string with explicit format.
+  Request node names use the VM admission policy. Set `allocate: false` for
+  validation without interning names (the returned node names stay strings).
   """
   @spec load_string(String.t(), :exs | :json | :yaml) ::
           {:ok, SwarmConfig.t()} | {:error, term()}
-  def load_string(content, format) do
+  @spec load_string(String.t(), :exs | :json | :yaml, keyword()) ::
+          {:ok, SwarmConfig.t()} | {:error, term()}
+  def load_string(content, format, opts \\ []) do
     Code.ensure_loaded!(SwarmConfig)
 
     with {:ok, config} <- parse_string(content, format) do
-      SwarmConfig.parse_existing(config)
+      SwarmConfig.parse_request(config, opts)
     end
   end
 
-  @doc "Normalizes a request configuration map without creating atoms."
-  def load_map(config) do
+  @doc "Normalizes request config keys safely and admits declared node names under the VM policy."
+  def load_map(config, opts \\ []) do
     Code.ensure_loaded!(SwarmConfig)
 
     with {:ok, normalized} <- normalize_config(config, &existing_key/1),
-         do: SwarmConfig.parse_existing(normalized)
+         do: SwarmConfig.parse_request(normalized, opts)
   end
 
   # Private functions
@@ -125,10 +129,25 @@ defmodule Genswarms.Config.Loader do
     config = deep_atomize_keys(config, key_fun)
     # Normalize agent backends from strings to atoms
     config = normalize_agent_backends(config)
+    config = normalize_topology(config)
     {:ok, config}
   end
 
   defp normalize_config(config, _key_fun), do: {:ok, config}
+
+  defp normalize_topology(%{topology: edges} = config) when is_list(edges) do
+    %{
+      config
+      | topology:
+          Enum.map(edges, fn
+            [from, to] -> {from, to}
+            %{from: from, to: to} -> {from, to}
+            edge -> edge
+          end)
+    }
+  end
+
+  defp normalize_topology(config), do: config
 
   # Convert serialized backend values to runtime forms.
   defp normalize_agent_backends(%{agents: agents} = config) when is_list(agents) do

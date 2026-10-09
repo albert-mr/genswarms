@@ -1,14 +1,29 @@
 defmodule Genswarms.Config.LoaderTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Genswarms.Config.Loader
+
+  setup context do
+    previous = Application.fetch_env(:genswarms, :restricted_names)
+    Application.put_env(:genswarms, :restricted_names, Map.get(context, :restricted, false))
+
+    on_exit(fn ->
+      case previous do
+        {:ok, value} -> Application.put_env(:genswarms, :restricted_names, value)
+        :error -> Application.delete_env(:genswarms, :restricted_names)
+      end
+    end)
+
+    :ok
+  end
 
   describe "load_string/2" do
     test "request configs still require an explicit agents list" do
       assert {:error, :missing_or_empty_agents} = Loader.load_map(%{"name" => "request"})
     end
 
-    test "request configs reject unknown names without creating atoms" do
+    @tag :restricted
+    test "restricted request configs reject unknown names without creating atoms" do
       for format <- [:json, :yaml] do
         name = "config_unknown_#{System.unique_integer([:positive])}"
 
@@ -17,7 +32,7 @@ defmodule Genswarms.Config.LoaderTest do
             do: Jason.encode!(%{name: "request", agents: [%{name: name, backend: "mock"}]}),
             else: "name: request\nagents:\n  - name: #{name}\n    backend: mock\n"
 
-        assert {:error, :unknown_name} = Loader.load_string(content, format)
+        assert {:error, :restricted_names} = Loader.load_string(content, format)
         assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
       end
     end

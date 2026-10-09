@@ -16,7 +16,7 @@ defmodule GenswarmsWeb.ConfigController do
   Returns validation result with any errors found.
   """
   def validate(conn, %{"config" => config}) when is_map(config) do
-    case Loader.load_map(config) do
+    case Loader.load_map(config, allocate: false) do
       {:ok, parsed} ->
         json(conn, %{
           valid: true,
@@ -49,7 +49,7 @@ defmodule GenswarmsWeb.ConfigController do
     # config_path on the server instead.
     case normalize_content_format(format) do
       {:ok, format_atom} ->
-        case Loader.load_string(content, format_atom) do
+        case Loader.load_string(content, format_atom, allocate: false) do
           {:ok, parsed} ->
             json(conn, %{valid: true, format: format, config: summarize_config(parsed)})
 

@@ -7,7 +7,7 @@ defmodule GenswarmsWeb.SwarmController do
 
   alias Genswarms.SwarmManager
   alias Genswarms.Agents.{AgentServer, AgentSupervisor}
-  alias Genswarms.Config.{Loader, SwarmConfig}
+  alias Genswarms.Config.{Loader, RequestNames, SwarmConfig}
   alias Genswarms.Backends.{DockerBackend, OciCli}
   alias Genswarms.Objects.{ObjectSupervisor, ObjectServer}
   alias Genswarms.Routing.Router
@@ -32,15 +32,23 @@ defmodule GenswarmsWeb.SwarmController do
   def create(conn, %{"ir" => document}) do
     result =
       with {:ok, ir} <- Genswarms.IR.State.parse(document),
-           true <- Enum.all?(ir.agents ++ ir.objects, &(safe_atom(&1.name) != nil)) do
+           :ok <- RequestNames.admit(Enum.map(ir.agents ++ ir.objects, & &1.name)) do
         SwarmManager.start_from_ir(document)
-      else
-        _ -> {:error, :unknown_name}
       end
 
     case result do
       {:ok, name} ->
         conn |> put_status(:created) |> json(%{status: "created", swarm_name: name})
+
+      {:error, reason}
+      when reason in [
+             :restricted_names,
+             :dynamic_name_limit_reached,
+             :atom_table_capacity_low,
+             :invalid_name_policy,
+             :invalid_node_name
+           ] ->
+        conn |> put_status(:bad_request) |> json(%{error: format_error(reason)})
 
       {:error, _} ->
         conn |> put_status(:bad_request) |> json(%{error: "Invalid or unavailable IR seed"})
@@ -1057,13 +1065,16 @@ defmodule GenswarmsWeb.SwarmController do
   Body: agent spec (name, backend, skills, ...) plus optional "connections", "incoming"
   """
   def add_agent(conn, %{"swarm_name" => swarm} = params) do
-    {opts, spec_params} = extract_topology_opts(params)
-    spec = parse_agent_spec(spec_params)
+    spec = parse_agent_spec(params)
 
     result =
-      if is_nil(spec.name),
-        do: {:error, :unknown_name},
-        else: SwarmManager.add_agent(swarm, spec, Keyword.put(opts, :persist, true))
+      with {:ok, config} <- SwarmManager.get_full_config(swarm),
+           :ok <- Genswarms.IR.Gate.validate_add_agent(config, spec),
+           :ok <- RequestNames.admit([spec.name]) do
+        {opts, _} = extract_topology_opts(params)
+        spec = %{spec | name: safe_atom(spec.name)}
+        SwarmManager.add_agent(swarm, spec, Keyword.put(opts, :persist, true))
+      end
 
     case result do
       {:ok, name} ->
@@ -1096,10 +1107,18 @@ defmodule GenswarmsWeb.SwarmController do
     result =
       with {:ok, config} <- SwarmManager.get_full_config(swarm),
            :ok <- Genswarms.IR.Gate.validate_scale(config, base, count),
-           true <- count == 0 or Enum.all?(1..count, &(safe_atom("#{base}_#{&1}") != nil)) do
+           true <-
+             Enum.any?(config.agents, fn spec ->
+               name = to_string(spec.name)
+               name == base or String.starts_with?(name, "#{base}_")
+             end),
+           :ok <-
+             RequestNames.admit(
+               if(count == 0, do: [], else: Enum.map(1..count, &"#{base}_#{&1}"))
+             ) do
         SwarmManager.scale_agent_group(swarm, base, count, persist: true)
       else
-        false -> {:error, :unknown_name}
+        false -> {:error, :no_template}
         error -> error
       end
 
@@ -1120,8 +1139,7 @@ defmodule GenswarmsWeb.SwarmController do
   POST /api/swarms/:swarm_name/objects
   """
   def add_object(conn, %{"swarm_name" => swarm} = params) do
-    {opts, spec_params} = extract_topology_opts(params)
-    spec = parse_object_spec(spec_params)
+    spec = parse_object_spec(params)
 
     # parse_object_spec only resolves handler to a module that implements the
     # ObjectHandler behaviour; anything else becomes nil. Reject here so a
@@ -1132,9 +1150,12 @@ defmodule GenswarmsWeb.SwarmController do
       |> json(%{error: "Invalid or missing object handler"})
     else
       result =
-        if is_nil(spec.name),
-          do: {:error, :unknown_name},
-          else: SwarmManager.add_object(swarm, spec, Keyword.put(opts, :persist, true))
+        with {:ok, _} <- SwarmManager.get_full_config(swarm),
+             :ok <- RequestNames.admit([spec.name]) do
+          {opts, _} = extract_topology_opts(params)
+          spec = %{spec | name: safe_atom(spec.name)}
+          SwarmManager.add_object(swarm, spec, Keyword.put(opts, :persist, true))
+        end
 
       case result do
         {:ok, name} ->
@@ -1290,7 +1311,7 @@ defmodule GenswarmsWeb.SwarmController do
 
   defp parse_agent_spec(params) do
     %{
-      name: safe_atom(params["name"]),
+      name: params["name"],
       backend: parse_backend(params["backend"]),
       skills: params["skills"] || [],
       model: params["model"],
@@ -1302,7 +1323,7 @@ defmodule GenswarmsWeb.SwarmController do
 
   defp parse_object_spec(params) do
     %{
-      name: safe_atom(params["name"]),
+      name: params["name"],
       handler: safe_module(params["handler"]),
       backend: parse_backend(params["backend"]),
       # JSON gives string keys; a handler reads config with atom keys (as at

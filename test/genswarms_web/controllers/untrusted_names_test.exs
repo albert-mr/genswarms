@@ -3,6 +3,20 @@ defmodule GenswarmsWeb.UntrustedNamesTest do
   import Phoenix.ConnTest
   alias GenswarmsWeb.{SwarmController, EventsController, SwarmChannel}
 
+  setup context do
+    previous = Application.fetch_env(:genswarms, :restricted_names)
+    Application.put_env(:genswarms, :restricted_names, Map.get(context, :restricted, false))
+
+    on_exit(fn ->
+      case previous do
+        {:ok, value} -> Application.put_env(:genswarms, :restricted_names, value)
+        :error -> Application.delete_env(:genswarms, :restricted_names)
+      end
+    end)
+
+    :ok
+  end
+
   defmodule Handler do
     @behaviour Genswarms.Objects.ObjectHandler
     def init(_), do: {:ok, %{}}
@@ -55,20 +69,33 @@ defmodule GenswarmsWeb.UntrustedNamesTest do
     uninterned(name)
   end
 
-  test "HTTP agent and object creation reject names that have not been configured" do
+  @tag :restricted
+  test "restricted HTTP agent and object creation reject names that have not been configured" do
+    swarm = "restricted-add-#{System.unique_integer([:positive])}"
+
+    {:ok, ^swarm} =
+      Genswarms.SwarmManager.start_from_config(%{
+        name: swarm,
+        agents: [%{name: :worker, backend: :mock}]
+      })
+
+    on_exit(fn -> Genswarms.SwarmManager.stop(swarm) end)
+
     for {action, extra} <- [
           {:add_agent, %{"backend" => "mock"}},
           {:add_object, %{"handler" => inspect(Handler)}}
         ] do
       name = fresh()
-      params = Map.merge(%{"swarm_name" => "missing", "name" => name}, extra)
+      params = Map.merge(%{"swarm_name" => swarm, "name" => name}, extra)
       conn = apply(SwarmController, action, [build_conn(), params])
       assert conn.status == 400
+      assert Jason.decode!(conn.resp_body)["error"] == "restricted_names"
       uninterned(name)
     end
   end
 
-  test "HTTP config creation rejects fresh names before boot" do
+  @tag :restricted
+  test "restricted HTTP config creation rejects fresh names before boot" do
     name = fresh()
 
     conn =
@@ -90,7 +117,8 @@ defmodule GenswarmsWeb.UntrustedNamesTest do
     uninterned(name)
   end
 
-  test "HTTP scaling cannot introduce new derived names" do
+  @tag :restricted
+  test "restricted HTTP scaling cannot introduce new derived names" do
     base = fresh()
     swarm = "http-scale-#{System.unique_integer([:positive])}"
 
@@ -162,6 +190,172 @@ defmodule GenswarmsWeb.UntrustedNamesTest do
 
     assert conn.status == 200
     assert Jason.decode!(conn.resp_body)["result"]["added"] == [Atom.to_string(:http_allowed_1)]
+  end
+
+  test "dynamic HTTP creation, additions and scaling accept fresh node names" do
+    swarm = "http-dynamic-#{System.unique_integer([:positive])}"
+    base = fresh()
+    extra = fresh()
+    object = fresh()
+    on_exit(fn -> Genswarms.SwarmManager.stop(swarm) end)
+
+    conn =
+      SwarmController.create(build_conn(), %{
+        "config" => %{"name" => swarm, "agents" => [%{"name" => base, "backend" => "mock"}]}
+      })
+
+    assert conn.status == 201
+
+    conn =
+      SwarmController.add_agent(build_conn(), %{
+        "swarm_name" => swarm,
+        "name" => extra,
+        "backend" => "mock",
+        "connections" => [base]
+      })
+
+    assert conn.status == 201
+
+    conn =
+      SwarmController.add_object(build_conn(), %{
+        "swarm_name" => swarm,
+        "name" => object,
+        "handler" => inspect(Handler),
+        "incoming" => [base]
+      })
+
+    assert conn.status == 201
+
+    conn =
+      SwarmController.scale_agent_group(build_conn(), %{
+        "swarm_name" => swarm,
+        "base_name" => base,
+        "count" => 2
+      })
+
+    assert conn.status == 200
+    assert Jason.decode!(conn.resp_body)["result"]["added"] == [base <> "_1", base <> "_2"]
+
+    {:ok, config} = Genswarms.SwarmManager.get_full_config(swarm)
+
+    for replica <- [base <> "_1", base <> "_2"] do
+      assert {String.to_existing_atom(extra), String.to_existing_atom(replica)} in config.topology
+
+      assert {String.to_existing_atom(replica), String.to_existing_atom(object)} in config.topology
+    end
+  end
+
+  test "dynamic HTTP IR creation admits fresh names" do
+    swarm = "http-dynamic-ir-#{System.unique_integer([:positive])}"
+    name = fresh()
+    on_exit(fn -> Genswarms.SwarmManager.stop(swarm) end)
+
+    {:ok, state} =
+      Genswarms.IR.FromConfig.from_config(%{
+        name: swarm,
+        agents: [%{name: name, backend: :mock}]
+      })
+
+    uninterned(name)
+    conn = SwarmController.create(build_conn(), %{"ir" => Genswarms.IR.State.to_map(state)})
+    assert conn.status == 201
+    assert is_atom(String.to_existing_atom(name))
+  end
+
+  test "the global name budget rejects a scale batch and survives deletion" do
+    alias Genswarms.Config.RequestNames
+    previous = Application.fetch_env(:genswarms, :max_dynamic_names)
+    Application.put_env(:genswarms, :max_dynamic_names, RequestNames.allocated() + 2)
+
+    on_exit(fn ->
+      case previous do
+        {:ok, value} -> Application.put_env(:genswarms, :max_dynamic_names, value)
+        :error -> Application.delete_env(:genswarms, :max_dynamic_names)
+      end
+    end)
+
+    swarm = "http-budget-#{System.unique_integer([:positive])}"
+    base = fresh()
+    on_exit(fn -> Genswarms.SwarmManager.stop(swarm) end)
+
+    params = %{
+      "config" => %{"name" => swarm, "agents" => [%{"name" => base, "backend" => "mock"}]}
+    }
+
+    assert SwarmController.create(build_conn(), params).status == 201
+
+    conn =
+      SwarmController.scale_agent_group(build_conn(), %{
+        "swarm_name" => swarm,
+        "base_name" => base,
+        "count" => 2
+      })
+
+    assert conn.status == 400
+    assert Jason.decode!(conn.resp_body)["error"] == "dynamic_name_limit_reached"
+    uninterned(base <> "_1")
+    uninterned(base <> "_2")
+    {:ok, config} = Genswarms.SwarmManager.get_full_config(swarm)
+    assert length(config.agents) == 1
+
+    extra = fresh()
+
+    assert SwarmController.add_agent(build_conn(), %{
+             "swarm_name" => swarm,
+             "name" => extra,
+             "backend" => "mock"
+           }).status == 201
+
+    assert SwarmController.remove_agent(build_conn(), %{
+             "swarm_name" => swarm,
+             "agent_name" => extra
+           }).status == 200
+
+    rejected = fresh()
+
+    conn =
+      SwarmController.add_agent(build_conn(), %{
+        "swarm_name" => swarm,
+        "name" => rejected,
+        "backend" => "mock"
+      })
+
+    assert conn.status == 400
+    assert Jason.decode!(conn.resp_body)["error"] == "dynamic_name_limit_reached"
+    uninterned(rejected)
+
+    # The same cap is shared by object creation and both swarm-creation forms.
+    conn =
+      SwarmController.add_object(build_conn(), %{
+        "swarm_name" => swarm,
+        "name" => rejected,
+        "handler" => inspect(Handler)
+      })
+
+    assert conn.status == 400
+    assert Jason.decode!(conn.resp_body)["error"] == "dynamic_name_limit_reached"
+
+    new_config = %{
+      name: swarm <> "-new",
+      agents: [%{name: rejected, backend: :mock}],
+      options: %{restricted_names: false, max_dynamic_names: 1_000_000}
+    }
+
+    {:ok, ir} = Genswarms.IR.FromConfig.from_config(new_config)
+
+    for body <- [%{"config" => new_config}, %{"ir" => Genswarms.IR.State.to_map(ir)}] do
+      conn = SwarmController.create(build_conn(), body)
+      assert conn.status == 400
+      assert Jason.decode!(conn.resp_body)["error"] == "dynamic_name_limit_reached"
+    end
+
+    uninterned(rejected)
+
+    # Stopping/recreating a swarm neither refunds nor recharges existing names.
+    assert {:ok, _} = Genswarms.SwarmManager.stop(swarm)
+    used = RequestNames.allocated()
+    assert SwarmController.create(build_conn(), params).status == 201
+    assert RequestNames.allocated() == used
   end
 
   test "HTTP event filters remain strings and do not create atoms" do
